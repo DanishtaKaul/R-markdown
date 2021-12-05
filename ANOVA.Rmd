@@ -1,0 +1,349 @@
+---
+title: "ANOVA"
+---
+
+## Activity 1: Load in packages and data
+
+You will need to load in the `broom`, `emmeans`, `afex`, and `tidyverse` packages. Then, load in the `keysar_lin_barr_2003.csv` data file and store it in an object called `dat`. The data file and assignment Rmd file can downloaded from Moodle.
+
+```{r t01, message = FALSE}
+# load packages here
+library(broom)
+library(emmeans)
+library(afex)
+library(tidyverse)
+dat <- read_csv("keysar_lin_barr_2003.csv")
+```
+
+Take a look at your data (`dat`) in the console using `glimpse()` or `View()`, or just display it by typing in the name. You will see the following columns:
+
+|variable   |description|
+|-----------|-----------|
+|`subject`  |unique identifier for each subject|
+|`sex`      |whether the subject was male or female|
+|`condition`|what condition the subject was in|
+|`looktime` |egocentric interference|
+
+We have simplified things from the original experiment by collapsing the baseline vs. experimental conditions into a single DV.  Our DV, egocentric interference, is the average difference in looking time for each subject (in milliseconds per trial) for hidden competitors (e.g., small candle) versus hidden non-competitors (e.g., apple). The larger this number, the more egocentric interference the subject experienced.
+
+## Activity 2: Calculate cell means
+
+Use `dplyr` verbs to calculate means (and standard deviations) for each of the four cells created by factorially combining sex and condition. Do not use `aggregate()` or any other base R functions or functions from other packages.
+
+The result should be a table `cell_means` with four rows and four columns named `sex`, `condition`, `m` (for the mean), and `sd` (for the standard deviation). 
+
+Follow the case and spelling *exactly*.
+
+```{r t02}
+cell_means <- dat%>%
+  group_by (sex,condition) %>%
+  summarise(m=mean(looktime),
+            sd= sd(looktime))
+```
+
+## Activity 3: Means for sex
+
+Now calculate the means (and standard deviations) for sex, ignoring condition. The result should be a table `means_sex` with 2 rows and 3 columns named `sex`, `m`, and `sd`. 
+
+Follow the case and spelling *exactly*.
+
+```{r t03}
+means_sex <- dat%>%
+  group_by(sex) %>%
+  summarise (m=mean(looktime),
+             sd=sd(looktime))
+```
+
+## Activity 4: Means for condition
+
+Now do the same for condition, calculate the means and SD for each condition, ignoring sex. The result should be a table `means_cond` with 2 rows and 3 columns named `condition`, `m`, and `sd`.
+
+```{r t04}
+means_cond <- dat %>%
+  group_by(condition) %>%
+  summarise (m=mean(looktime),
+             sd=sd(looktime))
+```
+
+## Activity 5: Violin-boxplot
+
+Recreate the violin-boxplot from the instructions:
+
+```{r t05}
+ggplot(dat, aes(x = condition, y = looktime))+
+  geom_violin(trim = FALSE)+
+  geom_boxplot(width = .2)+
+   scale_x_discrete(name= "Condition",labels = c("False belief", "Ignorance"))+
+  scale_y_continuous(name = "Mean look time difference (ms)")
+```
+
+## Activity 6: One-way ANOVA
+
+Use the `aov_ez()` function to run a one-way ANOVA with `looktime` as the DV and `condition` as a between-subjects IV and display the results. The result of the call to `aov_ez()` should be stored in the variable `mod1`. 
+
+```{r t06}
+mod1 <- aov_ez(id = "subject",
+              dv = "looktime", 
+              between = "condition",
+              es = "pes",
+              type = 3,
+              data = dat)
+mod1
+```
+
+## Activity 7: t-test
+
+To show you how ANOVA and t-test are related, run an Welch t-test with `looktime` as the DV and `condition` as a between-subjects IV and store the result in a tibble named `ttest`.
+
+**Hint:** you need to use `tidy()` to complete this task.
+
+```{r t07}
+ttest <- t.test(looktime ~ condition, paired = FALSE, data = dat) %>% tidy()
+```
+
+## Activity 8: t and F
+
+Look at the F-ratio from the one-way ANOVA and the t-statistic from the t-test. Which of the following is true about *t* and *F*?
+
+1. F = t*2
+2. F = t^2
+3. t = F/2
+4. t = F*2
+
+* In the `t08` code chunk below, replace the `NULL` with the number of the statement below that is correct. Store this single value in `answer_t8`
+
+```{r t08}
+answer_t8 <- 2
+```
+
+The one-way ANOVA and t-test confirm that even with our simplified DV, there is no effect of condition upon looking time. Now, we will conduct a two-way ANOVA that includes `sex` as an additional independent variable.
+
+## Activity 9: Interaction plot
+
+Create an interaction plot of the cell means with lines like the one you learned about in the Factorial ANOVA R chapter. Put condition on the X axis. Use `ggplot2` functions to do this.
+
+```{r t09}
+ggplot(cell_means, aes(x = condition, y = m, group = sex, shape = sex)) +
+  geom_point(size = 3) +
+  geom_line(aes(linetype = sex))+
+  scale_y_continuous (name="Mean") +
+  scale_x_discrete(name= "Condition",labels = c("False belief", "Ignorance"))+
+  theme_classic()
+```
+
+## Activity 10: Run a factorial ANOVA
+
+Use the `aov_ez()` function to run a two-way ANOVA on these data, and display the results. The result of the call to `aov_ez()` should be stored in the variable `mod2`.
+
+**Hint**: to specify multiple between-subject variables use `between = c("IV1", "IV2")`
+
+```{r t10}
+mod2 <-aov_ez(id = "subject",
+               data = dat, 
+               between = c("condition","sex"), 
+               dv = "looktime", 
+               type = 3,
+               es = "pes")
+mod2
+```
+
+## Activity 11: Run post-hoc tests
+
+Because the interaction is not significant, you would not normally conduct follow-up tests, however, we will for the purposes of this worksheet.
+
+Use the `emmeans()` function to calculate the pairwise comparisons for the `condition` by `sex` interaction (note the order of the IVs) and save them in an object called `mod_pairwise`. Then, extract the contrasts, use `tidy()` to tidy up the output and then store them in an object named `mod_contrasts`.
+
+Run your code in the box below.
+
+```{r}
+mod_pairwise <- emmeans(mod2$aov, 
+              pairwise ~ condition|sex, 
+              adjust = "bonferroni")
+mod_contrasts <- mod_pairwise$contrasts %>%
+  tidy()
+```
+
+Find the p-value for the difference between the false belief and ignorance condition for female participants. 
+
+* In the `t11` code chunk below, replace the `NULL` with this p-value rounded to 3 decimal places. Store this single value in `answer_t11`. You can use code or you can enter the number manually, but it must be a single number and it must be rounded correctly.
+
+
+```{r t11}
+answer_t11 <- 0.342
+```
+
+The following 11 questions relate to the lecture content:
+
+## Activity 12
+
+What is the null hypothesis for an omnibus one-way ANOVA test?
+
+1. That the interaction is not significant
+2. The means of each group are equal
+3. The means of each group are not equal
+4. The probability of a given result occurring under the alternative hypothesis 
+
+Please replace the `NULL` below with the number of the option you think is correct. Please only use a single number, do not use words, and do **not** put the number in quotation marks.
+
+```{r t12}
+answer_t12 <- 2
+```
+
+## Activity 13
+
+Which of the following is not a multiple comparison correction to prevent family-wise error?
+
+1. Bonferroni
+2. Bonferroni-Holm
+3. Shapiro-Wilk
+4. Tukey LSD
+
+
+Please replace the `NULL` below with the number of the option you think is correct. Please only use a single number, do not use words, and do **not** put the number in quotation marks.
+
+```{r t13}
+answer_t13 <- 3
+```
+
+## Activity 14
+
+What is the between-subjects equivalent of the assumption of sphericity?
+
+1. Homoscedasticity
+2. Non-zero variance
+3. Mauchley's test
+4. Homogeneity of variance
+
+Please replace the `NULL` below with the number of the option you think is correct. Please only use a single number, do not use words, and do **not** put the number in quotation marks.
+
+```{r t14}
+answer_t14 <- 4
+```
+
+## Activity 15
+
+If the effect of factor A is dependent upon the level of factor B we can conclude that:
+
+1. There is an interaction between the two factors
+2. There is a main effect of both factors
+3. There is a main effect of factor A but not factor B
+4. There are two main effects and an interaction between A and B
+
+Please replace the `NULL` below with the number of the option you think is correct. Please only use a single number, do not use words, and do **not** put the number in quotation marks.
+
+```{r t15}
+answer_t15 <- 1
+```
+
+## Activity 16
+
+For a one-way ANOVA, the degrees of freedom between are calculated as:
+
+1. Sample size - 2
+2. Number of levels - 1
+3. Sample size - number of levels
+4. dfTotal - dfBetween
+
+Please replace the `NULL` below with the number of the option you think is correct. Please only use a single number, do not use words, and do **not** put the number in quotation marks.
+
+```{r t16}
+answer_t16 <- 2
+```
+
+## Activity 17
+
+According to Cohen's rules of thumb an effect size of ηp2 = .11 would be considered:
+
+1. Small
+2. Medium
+3. Large
+
+Please replace the `NULL` below with the number of the option you think is correct. Please only use a single number, do not use words, and do **not** put the number in quotation marks.
+
+```{r t17}
+answer_t17 <- 2
+```
+
+## Activity 18
+
+A study looks at how fast participants are to respond to different stimuli. The dependent variable is reaction time. All participants see both happy and sad faces as stimuli to test the effect of emotion on response time. Half of the participants drink caffeine before taking part in the study and half drink decaf coffee to test the effect of caffeine. Out of the following options, how would you describe the design of the study?
+
+1. 1 x 2 between-subjects design
+2. 2 x 2 within-subjects design
+3. 2 x 2 between-subjects design
+4. 2 x 2 mixed factorial design
+
+Please replace the `NULL` below with the number of the option you think is correct. Please only use a single number, do not use words, and do **not** put the number in quotation marks.
+
+```{r t18}
+answer_t18 <- 4
+```
+
+## Activity 19
+
+A one-way ANOVA has degrees of freedom between = 2 and degrees of freedom within = 63. What was the sample size (N) for this study?
+
+1. 65
+2. 66
+3. 61
+4. 64
+
+Please replace the `NULL` below with the number of the option you think is correct. Please only use a single number, do not use words, and do **not** put the number in quotation marks.
+
+```{r t19}
+answer_t19 <- 2
+```
+
+## Activity 20
+
+According to APA style, which of the below options is the correct way to write up the results of a one-way ANOVA?
+
+1. F = 4.85, df = 2, 9,p < .05, ηp2 = 0.52 
+2. F (2, 9) = 4.85, p < .05, ηp2 = 0.52
+3. F = 4.85, p (2, 9) < .05, ηp2 = 0.52 
+4. F = 4.85, p < .05
+
+Please replace the `NULL` below with the number of the option you think is correct. Please only use a single number, do not use words, and do **not** put the number in quotation marks.
+
+
+```{r t20}
+answer_t20 <- 2
+```
+
+## Activity 21
+
+Which of the following is a significant p-value according the standard cut-off criteria for psychology?
+
+1. .09
+2. 0.5
+3. .025
+4. .50
+
+
+Please replace the `NULL` below with the number of the option you think is correct. Please only use a single number, do not use words, and do **not** put the number in quotation marks.
+
+```{r t21}
+answer_t21 <- 3
+```
+
+## Activity 22
+
+Subtract each participant's score from the grand mean, square these differences, and then sum up all of the squared differences.
+
+What does this describe?
+
+1. Sum of squares total
+2. Sum of squares between
+3. Sum of squares within
+4. Sum of squares error
+
+Please replace the `NULL` below with the number of the option you think is correct. Please only use a single number, do not use words, and do **not** put the number in quotation marks.
+
+```{r t22}
+answer_t22 <- 1
+```
+
+Well done, you are finished. 
+
+It would be a good idea to now save your code, close Rstudio, reopen Rstudio, reopen your code, and then knit your code one last time. If there are no errors then your code should produce an HTML output with all your answers in place. If any errors appear you should try and rectify them before submitting the .Rmd file.
+

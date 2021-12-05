@@ -1,0 +1,355 @@
+---
+title: "Regression"
+---
+
+```{r setup, include=FALSE, message = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+In the book chapters you looked at the relationship between stats anxiety and engagement. In this portfolio we will go deeper into the data. First download the data and the Rmd assignment files through the zip folder on Moodle.
+
+First, note that the STARS survey has 6 different subscales:
+- Ask For Help: Anxiety related to getting help
+- Interpretation: Anxiety related to interpreting statistical output
+- Self-Concept: Anxiety related to perceived abilities
+- Teacher: Teacher-related anxiety
+- Test: Test-related anxiety
+- Worth: Feelings of Self-Worth
+
+The questions associated with each subscale are:
+
+|subscale       |questions                                                                      |
+|:--------------|:------------------------------------------------------------------------------|
+|Ask For Help   |Q03, Q16, Q19, Q23                                                             |
+|Interpretation |Q02, Q05, Q06, Q07, Q09, Q11, Q12, Q14, Q17, Q18, Q20                          |
+|Self-Concept   |Q25, Q31, Q34, Q38, Q39, Q48, Q51                                              |
+|Teacher        |Q30, Q32, Q43, Q44, Q46                                                        |
+|Test           |Q01, Q04, Q08, Q10, Q13, Q15, Q21, Q22                                         |
+|Worth          |Q24, Q26, Q27, Q28, Q29, Q33, Q35, Q36, Q37, Q40, Q41, Q42, Q45, Q47, Q49, Q50 |
+
+
+A table has been provided for you in `subscales.csv` that matches each question number to its corresponding subscale. This is a "lookup table" that allows us to match each item to a subscale through a join.
+
+In the book, you looked at whether the *mean anxiety* rating for each student predicted engagement.  In this portfolio, we will look at the relationship between mean anxiety and engagement *for each subscale*.
+
+## Load the data
+
+The code chunk below loads in the tidyverse and the data into `stars_raw`, `engage`, and `subscales`. It also reshapes the data for you, as was done in the book activity. After running this chunk have a look at the three resulting tibbles in your console.
+
+```{r load, message = FALSE, warning = FALSE}
+# leave this chunk as it is: do not alter any of the code
+library("tidyverse")
+
+stars_raw <- read_csv("L3_stars.csv") %>%
+  gather("question", "score", Q01:Q51) %>%
+  arrange(ID, question)
+
+engage <- read_csv("psess.csv")
+
+subscales <- read_csv("subscales.csv")
+```
+
+## Activity 1: Join the items to subscales
+
+The first thing you need to to is to map each item (question) onto the appropriate subscale using `inner_join()` to combine `stars_raw` and `subscales`. Name the resulting table `stars_sub`.
+
+```{r t01}
+stars_sub <- inner_join (stars_raw, subscales, by="question")
+```
+
+## Activity 2: Calculate `mean_anxiety` by student and subscale
+
+`stars_sub` has the data you need in long format. Now use `group_by()` and `summarise()` to calculate `mean_anxiety` for each combination of student and subscale, and store the resulting tibble in the variable `stars_submeans`. Don't forget to `ungroup()` at the end and remember also to remove NAs.
+
+```{r t02}
+stars_submeans <- stars_sub %>%
+  group_by (ID, subscale) %>%
+  summarise(mean_anxiety = mean(score, na.rm = TRUE)) %>%
+ungroup ()
+```
+
+## Activity 3: Combine with engagement measurement
+
+Now join `stars_submeans` with the data in `engage`. Save the resulting table as `joined`.
+
+```{r t03}
+joined <- inner_join (stars_submeans, engage, by = "ID")
+```
+
+## Activity 4: Scatterplots
+
+Use `ggplot2()` to create scatterplots with `mean_anxiety` on the X axis and `n_weeks` on the Y axis, but do it so there is *a separate scatterplot for each subscale*. Hint: use `facet_wrap()`
+
+```{r t04}
+ggplot(joined, aes(x=mean_anxiety, y=n_weeks)) +
+  geom_point() +
+  geom_smooth(method=lm) +
+  facet_wrap(~subscale) +
+  theme_light()
+```
+
+## Run regressions for each subscale
+
+Now you need to run 6 separate regressions predicting `n_weeks` from `mean_anxiety`, one for each of the six subscales.  Use the code chunk below to (1) pull out the data you need for each subscale, and (2) run a regression on it.  It is up to you to decide how to do this: there are many valid approaches.  How you do it won't be assessed; however, you will derive values from each of the 6 regressions that we will check later.
+
+```{r run_regressions}
+# run your regressions in this code chunk - it won't be marked
+Ask_For_Help <-filter(joined, subscale== "Ask For Help")
+Ask_For_Help_reg <- lm(n_weeks ~ mean_anxiety, Ask_For_Help)
+Ask_For_Help_summary <- summary(Ask_For_Help_reg)
+
+Interpretation <- filter(joined, subscale== "Interpretation")
+Interpretation_reg <- lm(n_weeks ~ mean_anxiety, Interpretation)
+Interpretation_summary <- summary(Interpretation_reg)
+
+Self_Concept <- filter(joined, subscale== "Self-Concept")
+Self_Concept_reg <- lm(n_weeks ~ mean_anxiety, Self_Concept)
+Self_Concept_summary <- summary(Self_Concept_reg)
+
+Teacher <- filter(joined, subscale== "Teacher")
+Teacher_reg <- lm(n_weeks ~ mean_anxiety, Teacher)
+Teacher_summary <- summary(Teacher_reg)
+
+Test <- filter(joined, subscale== "Test")
+Test_reg <- lm(n_weeks ~ mean_anxiety, Test)
+Test_summary <- summary(Test_reg)
+
+Worth <- filter(joined, subscale== "Worth")
+Worth_reg <- lm(n_weeks ~ mean_anxiety, Worth)
+Worth_summary <- summary(Worth_reg)
+```
+
+## Activity 5: Ask for help
+
+What is the slope relating `mean_anxiety` to `n_weeks` for the "Ask for Help" subscale? (Type the number rounded to 3dps or use code to extract it; the answer `slp_help` should be a *single number*).
+
+```{r t05}
+slp_help <- -1.128
+```
+
+## Activity 6: Interpretation
+
+What is the slope relating `mean_anxiety` to `n_weeks` for the "Interpretation" subscale? (Type the number rounded to 3dps or use code to extract it; the answer `slp_intr` should be a *single number*).
+
+```{r t06}
+slp_intr <- -1.958
+```
+
+## Activity 7: Self-Concept
+
+What is the slope relating `mean_anxiety` to `n_weeks` for the "Self-Concept" subscale? (Type the number rounded to 3dps or use code to extract it; the answer `slp_conc` should be a *single number*).
+
+```{r t07}
+slp_conc <- -1.040
+```
+
+## Activity 8: Teacher
+
+What is the slope relating `mean_anxiety` to `n_weeks` for the "Teacher" subscale? (Type the number rounded to 3dps or use code to extract it; the answer `slp_teach` should be a *single number*).
+
+```{r t08}
+slp_teach <- -0.899
+```
+
+## Activity 9: Test
+
+What is the slope relating `mean_anxiety` to `n_weeks` for the "Test" subscale? (Type the number rounded to 3dps or use code to extract it; the answer `slp_test` should be a *single number*).
+
+```{r t09}
+slp_test <- -1.111
+```
+
+## Activity 10: Worth
+
+What is the slope relating `mean_anxiety` to `n_weeks` for the "Worth" subscale? (Type the number rounded to 3dps or use code to extract it; the answer `slp_worth` should be a *single number*).
+
+```{r t10}
+slp_worth <- -1.356
+```
+
+## Activity 11: Rank the slopes for the subscales
+
+Alter the vector `subrank` below so that the subscales are ordered by slope, from lowest (most negative) to highest (least negative). You can copy and paste or re-type the names, but if you re-type them, make sure you use the *EXACT* subscale names as they appear in the data (including capitalisation), and do not forget the quotation marks.
+
+```{r t11}
+subrank <- c("Interpretation","Worth","Ask For Help","Test", "Self-Concept","Teacher")
+```
+
+## Activity 12
+
+Which of the following is true?
+
+1. Both ANOVA and regression can be used when you have categorical predictors, but only ANOVA can be used when you have continuous predictors.
+2. Both ANOVA and regression can be used when you have categorical predictors, but only regression can be used when you have continuous predictors.
+3. Both ANOVA and regression can be used when you have categorical and continious predictors.
+4. Both ANOVA and regression can be used when you have categorical outcomes, but only ANOVA can be used when you have continuous predictors. 
+
+Please replace the `NULL` below with the number of the option you think is correct. Please only use a single number, do not use words, and do **not** put the number in quotation marks.
+
+```{r t12}
+answer_t12 <- 2
+```
+
+## Activity 13
+
+The Sum of Squares Total calculates the residuals:
+
+1. Using the mean as the model
+2. Using the best fitting model
+3. Using the worst fitting model
+4. Using no model
+
+Please replace the `NULL` below with the number of the option you think is correct. Please only use a single number, do not use words, and do **not** put the number in quotation marks.
+
+```{r t13}
+answer_t13 <- 1 
+```
+
+## Activity 14
+
+In a simple linear regression, if there is no relationship between the outcome and the predictor variable, the slope will be:
+
+1. Positive
+2. Negative
+3. Zero
+
+
+Please replace the `NULL` below with the number of the option you think is correct. Please only use a single number, do not use words, and do **not** put the number in quotation marks.
+
+```{r t14}
+answer_t14 <- 3
+```
+
+## Activity 15
+
+What can the F-ratio be used to conclude?
+
+1. How strong the predictive value of your model is
+2. Whether individual predictors are significant
+3. Whether your overall model significantly predicts the outcome variable
+
+Please replace the `NULL` below with the number of the option you think is correct. Please only use a single number, do not use words, and do **not** put the number in quotation marks.
+
+```{r t15}
+answer_t15 <- 3
+```
+
+## Activity 16
+
+A researcher includes the categorical predictor `condition` in their model and it has two levels, `placebo` and `drug`. They want to their regression model to compare scores in the `drug` condition to scores in `placebo` condition. How should they code their categorical variable to achieve this?
+
+1. placebo = 0, drug = 1
+2. placebo = 1, drug = 0
+3. placebo = .5, drug = -.5
+4. placebo = -.5, drug = .5
+
+Please replace the `NULL` below with the number of the option you think is correct. Please only use a single number, do not use words, and do **not** put the number in quotation marks.
+
+```{r t16}
+answer_t16 <- 1
+```
+
+## Activity 17
+
+A researcher constructs a regression model with two continuous predictors and they want to assess the impact of the predictors on their own, as well as testing the interaction between the two. Which code will give them this analysis?
+
+1. lm(dv ~ predictor1 + predictor2, data)
+2. lm(dv ~ predictor1 * predictor2, data)
+3. lm(dv ~ predictor1 x predictor2, data)
+
+Please replace the `NULL` below with the number of the option you think is correct. Please only use a single number, do not use words, and do **not** put the number in quotation marks.
+
+```{r t17}
+answer_t17 <- 2
+```
+
+## Activity 18
+
+A researcher runs the below code. Which description best fits what this researcher's approach was?
+
+```{r eval = FALSE}
+mod1 <- lm(score ~ condition, data)
+mod2 <- lm(score ~ condition + gender, data)
+anova(mod1, mod2)
+```
+
+
+1. The researcher used the "Enter" method to assess all predictors simultaneously.
+2. The researcher constructed a hierarchial regression model that allows them to judge whether adding `gender` improves the model.
+3. The researcher constructed a hierarchial regression model that allows them to judge whether adding `condition` improves the model.
+
+Please replace the `NULL` below with the number of the option you think is correct. Please only use a single number, do not use words, and do **not** put the number in quotation marks.
+
+```{r t18}
+answer_t18 <- 2
+```
+
+## Activity 19
+
+How do you "mean centre" a continuous predictor?
+
+1. Recode the variable to .5, -.5.
+2. Subtract the mean score for the outcome variable from each indivdual score for that variable.
+3. Subtract the mean score for that variable from each individual score for that variable.
+
+Please replace the `NULL` below with the number of the option you think is correct. Please only use a single number, do not use words, and do **not** put the number in quotation marks.
+
+```{r t19}
+answer_t19 <- 3
+```
+
+## Activity 20
+
+If you want to ensure that the slopes of your predictors could be compared to the results of another study that used different measurements, what should you calculate?
+
+1. Unstandardised betas
+2. Standardised alphas
+3. Standard error
+4. Standardised betas
+
+Please replace the `NULL` below with the number of the option you think is correct. Please only use a single number, do not use words, and do **not** put the number in quotation marks.
+
+```{r t20}
+answer_t20 <- 4
+```
+
+## Activity 21
+
+Look at the regression output in the instructions.
+
+Is the overall model fit significant?
+
+1. Yes, the overall model fit is significiant.
+2. No, the overall model fit is non-significant.
+3. There is not enough information in the output to conclude whether the overall model fit is significant. 
+
+Please replace the `NULL` below with the number of the option you think is correct. Please only use a single number, do not use words, and do **not** put the number in quotation marks.
+
+```{r t21}
+answer_t21 <- 1
+```
+
+## Activity 22
+
+Look at the regression output from Activity 21. 
+
+What percent of the variance in the outcome predictor does the model account for?
+
+1. 0.05% 
+2. 0.5%
+3. 5.0 %
+4. 50.04%
+
+Please replace the `NULL` below with the number of the option you think is correct. Please only use a single number, do not use words, and do **not** put the number in quotation marks.
+
+```{r t22}
+answer_t22 <- 3
+```
+
+
+# Finished
+
+Well done, you are finshed. 
+
+It would be an excellent idea to now save your code, close Rstudio, reopen Rstudio, reopen your code, and then knit your code one last time. If there are no errors then your code should produce an HTML output with all your answers in place. If any errors appear you should try and rectify them before submitting the .Rmd file.
+
