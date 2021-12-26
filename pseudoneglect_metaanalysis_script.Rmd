@@ -1,0 +1,125 @@
+```{r}
+
+library(robumeta) # for robumeta()
+library(openxlsx) # for read.xlsx()
+library(summarytools) # for freq()
+library(metafor)
+library(ggplot2)
+library(tidyverse)
+library(Hmisc)
+library(ggpubr)
+library(papaja) # for theme_apa()
+library(mvmeta)
+```
+
+# LOAD DATA -----------------------------------------------------------
+
+```{r}
+# Overall data
+overall_data <- read.xlsx("Data extraction spreadsheet final changed.xlsx")
+moderator_data1 <- read.xlsx("hand used.xlsx")
+moderator_data2 <- read.xlsx("Sex.xlsx")
+#view(overall_data)
+
+#subset LB and LM data
+LB <-overall_data[overall_data$Task_type == "1",]
+LM <-overall_data[overall_data$Task_type == "2",]
+
+# how many participants
+sumN <- sum(overall_data$N, na.rm = TRUE)
+```
+
+# OVERALL FIXED AND RANDOM MODELS -----------------------------------------------------------
+```{r}
+
+# overall fixed effects model for LB (this matches)
+model_fixed_LB <- rma(Cohens_d, Variance, method="FE", data=LB)
+print(model_fixed_LB)
+
+
+# overall random effects model for LB
+model_random_LB <- rma(Cohens_d, Variance, data=LB)
+print(model_random_LB)
+
+# overall random effects model for LM
+model_random_LM <- rma(Cohens_d, Variance, data=LM)
+print(model_random_LM)
+```
+
+
+# MODERATOR ANALYSIS -----------------------------------------------------------
+```{r}
+
+# 1. Random effects (moderator = mean age)
+LB$Mean.age <- as.numeric(LB$Mean.age)
+model_rm_age <- rma(Cohens_d ~ Mean.age, Variance, data=LB)
+print(model_rm_age)
+```
+
+```{r}
+
+# 2a. Random effects (moderator = sex)
+Sex <- read.xlsx("Sex.xlsx")
+model_rm_sex2 <- rma(Cohens_d ~ Moderator.Sex, Variance, data=Sex) #overall model
+print(model_rm_sex2)
+Males <-Sex[Sex$Moderator.Sex == "1",]
+Females <-Sex[Sex$Moderator.Sex == "2",]
+model_rm_males <- rma(Cohens_d ~ 1, Variance, data=Males) #males
+print(model_rm_males)
+model_rm_females <- rma(Cohens_d ~ 1, Variance, data=Females) #females
+print(model_rm_females)
+
+#Moderator= Hand Used
+Hand_Used <- read.xlsx("hand used.xlsx")
+model_rm_hand_used2 <- rma(Cohens_d ~ Moderator.Hand.Used, Variance, data=Hand_Used)
+print(model_rm_hand_used2)
+Left_Hand <-Hand_Used[Hand_Used$Moderator.Hand.Used == "1",]
+Right_Hand <-Hand_Used[Hand_Used$Moderator.Hand.Used == "2",]
+model_rm_left_hand <- rma(Cohens_d ~ 1, Variance, data=Left_Hand) #males
+print(model_rm_left_hand)
+model_rm_right_hand <- rma(Cohens_d ~ 1, Variance, data=Right_Hand) #females
+print(model_rm_right_hand)
+```
+
+```{r}
+
+# 2b. Random effects (moderator = percentage male)
+LB$Percentage_male <- as.numeric(LB$Percentage_male)
+model_rm_sex1 <- rma(Cohens_d ~ Percentage_male, Variance, data=LB)
+print(model_rm_sex1)
+```
+
+
+#  PUBLICATION BIAS -----------------------------------------------------------
+```{r}
+
+# funnel plot LB 
+refline <- mean(LB$Cohens_d, na.rm = TRUE)
+funnel(LB$Cohens_d, LB$Variance, LB$SE, LB$N,
+       xlim = c(-2,2), ylim = c(0,1,2), ylab = "Standard error", xlab = "Std diff in means", refline = refline)
+Fig2a <- "placeholder"
+
+
+# Egger's test LB
+regtest(LB$Cohens_d, LB$Variance, LB$SE, LB$N, model="lm")
+
+# trim & fill LB
+uni <- rma.uni(LB$Cohens_d, LB$Variance, LB$SE, LB$N)
+print(uni) #results random-effects model
+
+#Below 3 lines are not working
+fill <-trimfill(uni, estimator="Q0")
+print(fill) #number of missing studies
+funnel(fill, xlim = c(-2,2), ylim = c(0,1,2), ylab = "Standard error", xlab = "Std diff in means", refline = refline)
+```
+
+
+#  FOREST PLOTS -----------------------------------------------------------
+```{r}
+
+# create forest plot for random effects LB
+forest(model_random_LB, slab=LB$Study.name, xlim = c(-5,5), showweights = TRUE, header = TRUE, xlab = "")
+
+# create forest plot for random effects LM
+forest(model_random_LM, slab=LM$Study.name, xlim = c(-5,5), showweights = TRUE, header = TRUE, xlab = "")
+```
