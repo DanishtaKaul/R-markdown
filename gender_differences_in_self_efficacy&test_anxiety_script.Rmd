@@ -1,0 +1,219 @@
+---
+title: "analysis_template"
+date: "20/01/2020"
+---
+
+#### 1. Load in packages and data
+
+```{r}
+library(tidyverse)
+library(dplyr)
+library(car)
+library(lsr)
+library (Hmisc)
+library(ggpubr)
+
+demo <- read_csv("demographics.csv")
+mslq <- read_csv("mslq.csv")
+```
+
+#### 2. Clean up the data
+
+```{r}
+demo_final <- demo %>% 
+  group_by(user_id, q_id) %>% 
+  filter(session_id == min(session_id), endtime == min(endtime)) %>% 
+  filter(row_number() == 1) %>% 
+  ungroup() %>% 
+  filter(user_status %in% c("guest", "registered")) %>%
+  select(user_id, user_sex, user_age, q_name, dv) %>%
+  pivot_wider(names_from = q_name, values_from = dv)
+
+mslq_final <- mslq %>% 
+  group_by(user_id, q_id) %>% 
+  filter(session_id == min(session_id), endtime == min(endtime)) %>% 
+  filter(row_number() == 1) %>% 
+  ungroup() %>% 
+  filter(user_status %in% c("guest", "registered")) %>%
+  select(user_id, user_sex, user_age, q_name, dv) %>%
+  arrange(q_name) %>%
+  pivot_wider(names_from = q_name, values_from = dv)
+
+```
+
+#### 3. Join together the data files by their common columns
+
+```{r}
+join <- inner_join(mslq_final, demo_final, by = c("user_id", "user_sex", "user_age"))
+```
+
+#### 4. Use select to retain only the desired variables.
+
+```{r}
+new_dat_anxiety <- select (.data= join,user_id, anxiety_1,anxiety_2,anxiety_3,anxiety_4,anxiety_5, user_sex)
+
+new_dat_efficacy <- select (.data= join,user_id, self_efficacy_1,self_efficacy_2,self_efficacy_3,self_efficacy_4,self_efficacy_5,self_efficacy_6,self_efficacy_7,self_efficacy_8, user_sex)
+```
+
+#### 5. Use filter to retain only the observations needed
+
+```{r}
+old_dat_anxiety_filtered <- filter (new_dat_anxiety, user_sex=="male"|user_sex=="female")
+
+old_dat_efficacy_filtered <- filter (new_dat_efficacy, user_sex=="male"|user_sex=="female")
+
+new_dat_anxiety_filtered <- drop_na(old_dat_anxiety_filtered)
+
+new_dat_efficacy_filtered <- drop_na(old_dat_efficacy_filtered)
+```
+
+#### 6. Calculate the mean score for each participant for each sub-scale. 
+
+```{r eval = TRUE}
+temp <- new_dat_anxiety_filtered %>% 
+  gather(var, val, anxiety_1:anxiety_5)
+
+dat_means_anxiety <- new_dat_anxiety_filtered %>% 
+  gather(var, val, anxiety_1:anxiety_5) %>% 
+  group_by_at(vars(-val, -var)) %>% # group by everything except the val and var columns
+  summarise(anxiety_mean = mean(val, na.rm = TRUE)) %>% 
+  ungroup() 
+
+temp2 <- new_dat_efficacy_filtered %>%
+  gather(var, val, self_efficacy_1:self_efficacy_8)
+dat_means_efficacy <- new_dat_efficacy_filtered %>% 
+  gather(var, val, self_efficacy_1:self_efficacy_8) %>% 
+  group_by_at(vars(-val, -var)) %>% 
+  summarise(self_efficacy_mean = mean(val, na.rm = TRUE)) %>% 
+  ungroup() 
+```
+
+#### 7. Data Visualization
+
+T-test visualisation
+
+```{r}
+# create summary data to use with `geom_pointrange()`
+summary_dat_anxiety<-dat_means_anxiety %>%
+  group_by(user_sex)%>%
+  summarise(mean = mean(anxiety_mean),
+            min = mean(anxiety_mean) - 1.96*sd(anxiety_mean)/sqrt(n()), # 95% confidence intervals
+            max = mean(anxiety_mean) + 1.96*sd(anxiety_mean)/sqrt(n()))
+
+
+ggplot(dat_means_anxiety, aes(x = user_sex, y =anxiety_mean )) +
+  geom_violin(trim = FALSE) +
+  geom_boxplot(aes(fill = user_sex), width = .2, show.legend = FALSE) + 
+  geom_pointrange(data = summary_dat_anxiety,
+                  aes(x = user_sex, y = mean, ymin=min, ymax=max),
+                  shape = 20, 
+                  position = position_dodge(width = 0.1), show.legend = FALSE)
+
+ggplot(dat_means_anxiety, aes(x = user_sex, y = anxiety_mean, fill=user_sex))+
+  geom_boxplot()+
+  geom_jitter(height = 0, width = .1)
+
+
+summary_dat_efficacy<-dat_means_efficacy%>%
+  group_by(user_sex)%>%
+  summarise(mean = mean(self_efficacy_mean),
+            min = mean(self_efficacy_mean) - 1.96*sd(self_efficacy_mean)/sqrt(n()), # 95% confidence intervals
+            max = mean(self_efficacy_mean) + 1.96*sd(self_efficacy_mean)/sqrt(n()))
+
+
+ggplot(dat_means_efficacy, aes(x = user_sex, y = self_efficacy_mean )) +
+  geom_violin(trim = FALSE) +
+  geom_boxplot(aes(fill = user_sex), width = .2, show.legend = FALSE) + 
+  geom_pointrange(data = summary_dat_efficacy,
+                  aes(x = user_sex, y = mean, ymin=min, ymax=max),
+                  shape = 20, 
+                  position = position_dodge(width = 0.1), show.legend = FALSE)
+
+ggplot(dat_means_efficacy, aes(x = user_sex, y = self_efficacy_mean, fill=user_sex))+
+  geom_boxplot()+
+  geom_jitter(height = 0, width = .1)
+```
+
+
+
+#### 8. Check that the data meets the assumptions of t-test and correlation
+
+Correlation visualization and checking t-test assumptions
+
+```{r}
+
+qq_anxiety_male <- filter(dat_means_anxiety, user_sex=="male") %>%
+  group_by(user_sex) %>%
+  mutate(group_resid = anxiety_mean - mean(anxiety_mean)) %>%
+  ungroup()
+
+ggdensity(qq_anxiety_male$group_resid)
+qqPlot(qq_anxiety_male$group_resid)
+
+shapiro.test(x = qq_anxiety_male$group_resid)
+
+qq_anxiety_female <- filter(dat_means_anxiety, user_sex=="female") %>%
+  group_by(user_sex) %>%
+  mutate(group_resid = anxiety_mean - mean(anxiety_mean)) %>%
+  ungroup()
+
+ggdensity(qq_anxiety_female$group_resid)
+qqPlot(qq_anxiety_female$group_resid)
+
+shapiro.test(x = qq_anxiety_female$group_resid[0:5000]) 
+
+qq_self_efficacy_male <- filter(dat_means_efficacy, user_sex=="male") %>%
+  group_by(user_sex) %>%
+  mutate(group_resid = self_efficacy_mean - mean(self_efficacy_mean)) %>%
+  ungroup()
+
+ggdensity(qq_self_efficacy_male$group_resid)
+qqPlot(qq_self_efficacy_male$group_resid)
+
+shapiro.test(x = qq_self_efficacy_male$group_resid)
+
+qq_self_efficacy_female <- filter(dat_means_efficacy, user_sex=="female") %>%
+  group_by(user_sex) %>%
+  mutate(group_resid = self_efficacy_mean - mean(self_efficacy_mean)) %>%
+  ungroup()
+
+ggdensity(qq_self_efficacy_female$group_resid)
+qqPlot(qq_self_efficacy_female$group_resid)
+
+shapiro.test(x = qq_self_efficacy_female$group_resid[0:5000])
+
+```
+
+Check Correlation assumptions
+
+```{r}
+
+cor_visual<- inner_join(dat_means_anxiety,dat_means_efficacy, by = c("user_id", "user_sex"))
+
+ggplot(data = cor_visual, aes(x = self_efficacy_mean, y = anxiety_mean, colour= user_sex)) +
+  geom_jitter() +
+  scale_x_continuous(name= "Self-Efficacy")+
+scale_y_continuous(name= "Test Anxiety")+
+  geom_smooth(method = lm)
+
+```
+
+
+#### 9. Conduct statistical analyses
+
+T-test analysis
+
+```{r}
+t.test(dat_means_anxiety$anxiety_mean~ dat_means_anxiety$user_sex, alternative= "greater")
+
+t.test(dat_means_efficacy$self_efficacy_mean~ dat_means_efficacy$user_sex, alternative= "less")
+```
+
+Correlation analysis
+
+```{r}
+cor.test(cor_visual$self_efficacy_mean, cor_visual$anxiety_mean, method="pearson", alternative= "two.sided" )
+```
+
+
+
