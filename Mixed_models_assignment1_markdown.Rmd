@@ -1,0 +1,496 @@
+---
+title: "Mixed_Models_assignment1_markdown"
+author: '10976294'
+date: "2/21/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## <SPAN STYLE="font-family:'Caladea'">Loading the Packages</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">This is my third R assignment. For this assignment I will work on two separate questions.</SPAN>
+<SPAN STYLE="font-family:'Caladea'">First I will load my packages. The first package I loaded was `tidyverse` which is a collection of R packages that work well together. The second package was `ggthemes` which contains some extra geoms, scales and themes for `ggplot2`. The third package I loaded was `performance` which is used for checking model assumptions. The fourth package I loaded was `lme4` which is used to build mixed models. The fifth package I loaded was `lmerTest` which provides p-values in type I, II or III anova and summary tables for `lmer` model fits. The sixth package I loaded was `emmeans` which is used for running follow-up (post- hoc) tests. Next, I loaded the`visdat` package which provides a visualization of the entire data frame at once while also showing the missing data. Finally, I loaded the `fitdistrplus` package which  provides functions for fitting univariate distributions to different types of data.</SPAN>
+```{r, message=FALSE}
+library(tidyverse)
+library(ggthemes)
+library(performance)
+library(lme4) 
+library(lmerTest) 
+library(emmeans)
+library(visdat)
+library(fitdistrplus)
+```
+# <SPAN STYLE="font-family:'Caladea'">QUESTION 1</SPAN>
+
+## <SPAN STYLE="font-family:'Caladea'">Reading in the Data</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">In this code chunk I have used the function `read_csv` to import my data into R. Comma- separated values (csv) file format is an ideal way to get data into R as each line contains a row of data and the different elements in a line are separated by commas, thereby making it convenient for representing tabular data.</SPAN>
+<SPAN STYLE="font-family:'Caladea'">In R, variables, data, functions etc. are stored in the form of *objects* which can be assigned a name. I saved the data I read into R by creating an object and assigning it to a variable with the name **mixed_models_data1 **. In order to create the object **mixed_models_data1 ** I used the *assign* operator which is represented as `<-`.</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">This experiment involved a repeated measures design with 24 participants. Participants had to respond to a word that appeared in one of three contexts, i.e., *Neutral*, *Negative*, and *Positive*. There were 24 items and each item appeared in each of the three contexts. In the following code chunks I will build a linear mixed effects model to determine whether word context influenced response time.</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">I visualized my data using the `head()` function which shows the first 6 lines of the dataset. The output showed that the columns *subj*, *item* and *condition* have been coded as characters. However, my experimental design involves *condition* as a factor, hence in the next code chunk I will convert the *condition* column into a factor. Furthermore, I will build a linear mixed effects model in the following code chunks with subject and item as random effects. Therefore, in the next code chunk I will convert *subj* and *item* columns into factors as well.</SPAN>
+
+
+```{r, message=FALSE}
+mixed_models_data1 <- read_csv("assignment1_data1(1).csv")
+
+head(mixed_models_data1)
+
+```
+## <SPAN STYLE="font-family:'Caladea'">Converting the Variables into Factors </SPAN>
+
+
+<SPAN STYLE="font-family:'Caladea'">In this code chunk I have converted the **condition** column, **subj** column and **item** column into factors. In order to do so I used the `mutate` function from the `dplyr` package within `tidyverse`. The `mutate` function created a new *condition* column, *subj* column and *item* column that had been coded as factors. The following code chunk involved the first use of the pipe operator denoted by `%>%`. The pipe operator is used to pass information along to the line of code after the pipe, thereby, allowing me to chain one function after another. I saved the output in a new object called **factored_data**.</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">I used the `print()` function (a built-in function in R) to display the output of **factored_data**.</SPAN>
+```{r}
+factored_data <- mixed_models_data1 %>%
+  mutate(subj = factor(subj),
+         item = factor(item),
+         condition = factor(condition))
+print(factored_data)
+```
+## <SPAN STYLE="font-family:'Caladea'">Rename the Data</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">Here, I have used the `rename` function from `dplyr` package within `tidyverse` to change the column names. The column `subj` has been renamed as `Subject`, the column`DV` has been renamed as `Response_Time`, the `item` column has been renamed as`Item` and the `condition` column has been renamed as `Condition`.</SPAN>
+<SPAN STYLE="font-family:'Caladea'">The output has been stored in a new object called **renamed_factored_data**.</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">I have used the `print()` function to display the output of **renamed_factored_data**.</SPAN>
+```{r}
+renamed_factored_data <- factored_data %>%
+  rename(Subject=subj, Item=item, Response_Time=DV, Condition=condition)
+
+print(renamed_factored_data)
+```
+## <SPAN STYLE="font-family:'Caladea'">Summary Statistics</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">In this step I have calculated the summary statistics for my data. First, I saved my data in a new object called **statistical_summary**. Next, I used the `group_by` function to group the dataset by the  **Condition**  column.</SPAN> 
+<SPAN STYLE="font-family:'Caladea'">Subsequently, I used the `summarise` function to calculate the summary statistics for the three experimental conditions (Positive, Neutral and Negative). Next, I calculated the mean response time, standard deviation of response time, median response time, minimum response time, maximum response time, 90% quantile for response time and the number of observations.  Finally, I used the `arrange` function to order the output by mean response time (highest to lowest).</SPAN>
+<SPAN STYLE="font-family:'Caladea'">The mean response time for **Positive Condition** was the highest (mean= 1257.307 ms.) while the mean response time for **Negative Condition** was the lowest (mean= 1087.759 ms.).</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">I have used the `print()` function to display the output of **statistical_summary**.</SPAN>
+
+
+<SPAN STYLE="font-family:'Caladea'">*Note, here that the code `options(pillar.sigfig = 5)` specifies the number of significant digits that will be printed*.</SPAN>
+```{r}
+
+statistical_summary <- renamed_factored_data %>%
+  group_by (Condition) %>%
+  summarise(mean_Response_Time= mean(Response_Time), 
+            sd_Response_Time= sd(Response_Time), 
+            median_Response_Time= median(Response_Time),
+            min_Response_Time= min(Response_Time),
+            max_Response_Time= max(Response_Time),
+            quantile_Response_Time= quantile(Response_Time, 0.9),
+            number=n()) %>%
+arrange(-mean_Response_Time)
+
+options(pillar.sigfig = 5)
+
+print(statistical_summary, width=Inf)
+
+
+```
+
+## <SPAN STYLE="font-family:'Caladea'">Data Visualization</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">This plot demonstrates the effect of  word context on response time.  I have used the`ggplot2` package within `tidyverse` to make a violin plot including a box plot. The violin plot shows the distribution of the data, while the box plot represents the summary statistics.</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">For this visualization, I have used the **renamed_factored_data** dataset. The function `ggplot` has been used to construct the initial plot. The `+` symbol used between the `ggplot` lines is equivalent to the `%>%` operator used previously, the `+` is essential to add components to the plot. The line of code following `ggplot` indicates that *Condition* has been plotted on the x axis, while the Response Time has been plotted on the y axis.</SPAN>
+<SPAN STYLE="font-family:'Caladea'">The `geom_violin()` function has been used to produce a violin plot. Subsequently, I have used the `geom_jitter` function to add a small amount of random variation to each point (the alpha value specified after `geom_jitter` refers to the opacity of the geom).</SPAN> 
+<SPAN STYLE="font-family:'Caladea'">The `geom_boxplot()` function has been used to create a box plot for the three conditions (Negative, Neutral and Positive). In the line of code following `geom_boxplot()` I have specified `outlier.shape= NA` to hide the box plot outliers, I have also specified the width of the box plot and set the color of the box plot as black. The `stat_summary` function has been used to add some summary data such as the mean and confidence intervals around the mean. In the line of code that follows `stat_summary` , `fun.data`  is a complete summary function, and `mean_cl_boot` is used for producing bootstrapped confidence intervals without assuming normality. The legend has been suppressed by specifying the `guides` function as none. `theme_stata()`  from the `ggthemes` package has been used for the plot. The `theme` function has been used to customize the text angle, size and horizontal adjustment (hjust) on the x and y axes as well as the plot title. Finally, the `labs` function has been used to add the x and y axes labels as well as the title of the plot.</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">From the plot it can be seen that for both Negative and Positive condition there are some data points of extremely high response time. Conversely, Neutral condition does not have many data points of extremely high response time. From the summary statistics table (refer to **Summary Statistics**) it can be seen that the quantile response time for Negative condition is 1830.0 (ms.) and the quantile response time for Positive condition is 1850.3 (ms.). It can be seen that for Negative condition 90% of the participants had response times between minimum response time 314 (ms.) and quantile response time 1830.0 (ms.). Similarly, for Positive condition 90% of the participants had response times between minimum response time 361 (ms.) and quantile response time 1850.3 (ms.).</SPAN>
+
+
+```{r}
+renamed_factored_data %>%
+  ggplot(aes(x = Condition, y = Response_Time, colour = Condition)) + 
+  geom_violin() +
+  geom_jitter(alpha = .2, width = .1) +
+  geom_boxplot(outlier.shape = NA, width= .07, color= "black") +
+  stat_summary(fun.data = "mean_cl_boot", colour = "black") +
+  guides(colour = 'none') + 
+  theme_stata()+
+  theme(axis.text.x = element_text(angle = 30, hjust = 0.9, size= 9)) +
+  theme(axis.title.x = element_text(hjust = 0.5, size= 10)) +
+  theme(axis.title.y = element_text(size= 10)) +
+  theme(plot.title = element_text(size = 10, hjust= 0.5, color="black"))+
+  labs (title = "Effect of Word Context on Response Time", 
+       x = " Word Context", 
+       y = "Response Time (milliseconds)")    
+
+```
+
+## <SPAN STYLE="font-family:'Caladea'">Build the Linear Mixed Effects Model</SPAN>
+
+
+<SPAN STYLE="font-family:'Caladea'">I have used the `lmer` function from within the `lme4` package to build a linear mixed effects model. The line of code following the `lmer` function represents the syntax used by the `lmer` function for linear mixed effects models i.e.,- `lmer(Response_Time ~ Condition + (1 + Condition | Subject) + (1 + Condition | Item), data=renamed_factored_data)`. Here, `Response_Time` is the dependent variable, while `Condition` is the independent variable.`Condition` represents the fixed effect (fixed effect refers to when data has been gathered from all the levels of the factor that are of interest). The `~` symbol corresponds to predicted by. The terms `(1 + Condition | Subject)` and `(1 + Condition | Item)` tell the model to expect different intercepts for Subject and Item as well as differing slopes as a function of the factor Condition. The terms `(1 + Condition | Subject)` and `(1 + Condition | Item)` represent the random effects (random effects refers to when the factor has many possible levels, and interest is in all possible levels, but only a random sample of levels is included in the data). The last part of the syntax `data= renamed_factored_data` specifies the dataset I am using. Overall, this code indicates that the magnitude of the effect of **Condition** is different for different Subjects, and also the magnitude of the effect of **Condition** is different for different Items.</SPAN>
+                         
+<SPAN STYLE="font-family:'Caladea'">The output of the `lmer` function has been saved as a new object called **mixed_model**.</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">I have used the `print()` function to display the output of `mixed_model`.</SPAN>
+                         
+<SPAN STYLE="font-family:'Caladea'">Furthermore, I have used the `coef` function (a generic R function) to look at the coefficients of my model. The slopes between the three levels of **Condition** differ for each Subject and for each Item.</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">It is noteworthy to mention that when I build my mixed model I get the warning `boundary (singular) fit: see ?isSingular`. This means that I might be trying to estimate more parameters than can be estimated using the dataset of the size I have. In other words, the dataset may not be rich enough for the model I am trying to build. One solution for this is to simplify the random effects structure until the warning goes away. This step has been carried out in the next code chunk.</SPAN>
+```{r}
+mixed_model <- lmer(Response_Time ~ Condition + (1 + Condition | Subject) + 
+                         (1 + Condition | Item), data = renamed_factored_data)
+
+print(mixed_model)
+
+coef(mixed_model)
+
+```
+
+## <SPAN STYLE="font-family:'Caladea'">Build A Simplified Linear Mixed Effects Model</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">In this code chunk I have simplified the random effects structure of my model by dropping both the random slopes. The terms `(1 | Subject)` and `(1 | Item)` represent the two random effects and indicate that I am modelling each Subject and each Item as having their own individual intercept. The rest of the syntax for building the linear mixed effects model is the same as what was done in the previous code chunk **Build the Linear Mixed Effects Model**. The output of the `lmer` function has been saved in a new object called **mixed_model_1**.</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">I have used the `print()` function to display the output of **mixed_model_1**.</SPAN>
+```{r}
+mixed_model_1 <- lmer(Response_Time ~ Condition + (1 | Subject) + (1 | Item), 
+                       data = renamed_factored_data)
+
+print(mixed_model_1)
+```
+## <SPAN STYLE="font-family:'Caladea'">Check the Coefficients of the Model</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">In this code chunk I have used the `coef` function to look at the coefficients of my model. The different intercepts for each Subject and for each Item take into account individual baseline differences, however, the slopes are the same (this is because both the random slopes have been dropped).</SPAN>
+```{r}
+coef(mixed_model_1)
+```
+## <SPAN STYLE="font-family:'Caladea'">Check the Model Assumptions</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">Here, I have used the `check_model()` function from the `performance` package to check the model assumptions. The model assumptions look appropriate and in the next step I can generate the summary of my model.</SPAN>
+```{r}
+check_model(mixed_model_1, panel=FALSE)
+```
+
+## <SPAN STYLE="font-family:'Caladea'">Generate the Summary of the Linear Mixed Effects Model</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">In this code chunk, I have used the `summary` function to generate the summary of my previously created **mixed_model_1**. Note, here that the Intercept corresponds to the **Negative Condition** (reference level) - this is because R is using dummy coding of contrasts and the reference level is the condition that occurs first alphabetically. From the output, it can be seen that the Intercept parameter estimate is 1086.50(ms.) which corresponds to the mean response time of the Negative Condition. The mean response time for Neutral Condition is 98.28(ms.) more than the mean response time for Negative Condition, i.e., 1086.50(ms.) + 98.28(ms.) = 1184.78(ms.). This means that participants took 98.28(ms.) more to respond to the Neutral Condition as compared to the Negative Condition. Similarly, the mean response time for Positive Condition is 170.80(ms.) more than the mean response time for the Negative Condition, i.e., 1086.50(ms.) + 170.80(ms.)= 1257.30(ms.). This means that participants took 170.80(ms.) more to respond to the Positive Condition as compared to the Negative Condition.</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">The t-test values for the three levels of the Condition factor are-</br>
+Negative Condition(Intercept): t(45.21) = 14.407, p <2e-16</br>
+Neutral Condition: t(525.13) = 2.111, p= 0.035234</br>
+Positive Condition: t(525.09) = 3.674, p= 0.000263</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">It can be seen that the difference between Neutral Condition and the reference level is statistically significant (p= 0.035234). Similarly, the difference between Positive Condition and the reference level is also statistically significant (p <0.001).</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">*Note here that the values have not been rounded off (same will be followed for all subsequently reported values).</SPAN>
+```{r}
+summary(mixed_model_1)
+```
+
+## <SPAN STYLE="font-family:'Caladea'">Build a Model without the Fixed Effect</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">Here, I will compare the model with the fixed effect of **Condition** with a model which does not have this fixed effect. If the difference between the two models is significant, then I can conclude that the fixed effect is significant.</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">The syntax used for building the linear mixed effects model is the same as what was done in the code chunk **Build A Simplified Linear Mixed Effects Model** with the exception that the fixed effect of **Condition** has been dropped.This model indicates that response time is only being predicted by the random effects (Subject and Item).</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">The output of the model without the fixed effect has been saved as a new object called **mixed_model_null**.</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">I have used the `print()` function to display the output of **mixed_model_null**.</SPAN>
+```{r}
+mixed_model_null <- lmer(Response_Time ~ (1 | Subject) + (1 | Item), 
+                       data = renamed_factored_data)
+
+print(mixed_model_null)
+```
+
+## <SPAN STYLE="font-family:'Caladea'">Compare the Model with the Fixed Effect to the Model without the Fixed Effect</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">In this code chunk I have used the Likelihood Ratio Test (LRT) (it assesses the goodness of fit of two statistical models) to compare the model with the fixed effect of Condition to the model without. I have used the `anova` function to perform the LRT between **mixed_model_1** and **mixed_model_null**. Here, **mixed_model_1** contains both the fixed effect of *Condition* and the random effects of *Subject* and *Item*. Conversely, **mixed_model_null** only contains the random effects of *Subject* and *Item*.
+It is important to note here that models can only be compared to each other using the LRT if they are nested, i.e., if one model is a subset of the other. The output shows useful information about Akaike information criterion (AIC), Bayesian information criterion (BIC) and deviance (deviance for linear models corresponds to residual sum of squares). For both AIC and BIC lower numbers are better as they capture the amount of information that is not explained by the model. For the model with the fixed effect of Condition (*mixed_model_1*) both the AIC value (8754.2) and BIC value (8780.3) are lower than the AIC value (8763.7) and BIC value (8781.1) for the model without the fixed effect of Condition (*mixed_model_null*). Additionally, for the model with the fixed effect of Condition (*mixed_model_1*) deviance is less (8742.2) as compared to the model without the fixed effect of Condition (*mixed_model_null*) which has a deviance value of 8755.7. The chi-squared result [χ2(2) = 13.473, p = 0.001187] shows that when the two models (mixed_model_1 and mixed_model_null) are compared to each other they differ significantly.</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">All measures of model fit demonstrate that the mixed model with both the fixed effect and random effects (*mixed_model_1*) is a better way of capturing the data as compared to the model with only the random effects (*mixed_model_null*). Therefore, the fixed effect corresponding to the experimental factor is explaining a significant portion of the variability in the dataset.</SPAN>
+```{r}
+anova(mixed_model_1, mixed_model_null)
+```
+
+
+## <SPAN STYLE="font-family:'Caladea'">Pairwise Comparisons</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">Now, I will conduct pairwise comparisons (using the `emmeans()` function from within the `emmeans` package) in order to determine which level(s) of the factor (Condition) are differ from which other level(s). The line of code that follows `emmeans()` first denotes the dataset to be used and then indicates that pairwise is predicted by (`~`) `Condition`. It is important to note here that since I have not specified an adjustment for multiple comparisons (e.g., Bonferroni correction) the default adjustment for multiple comparisons in R will be used i.e., **Tukey's**.</SPAN> 
+
+<SPAN STYLE="font-family:'Caladea'">Tukey comparisons reveal that the difference in response time when a word is presented in Negative context vs. when a word is presented in Neutral context is not statistically significant [t(525)= -2.111, p= 0.0885]. Conversely, the difference in response time when a word is presented in Negative context vs. Positive context is statistically significant [t(525)= -3.674, p=  0.0008]. Therefore, participants' response time to words presented in Negative context (1087.759ms.) is significantly quicker as compared to words presented in Positive Context (1257.307ms.).</SPAN>
+<SPAN STYLE="font-family:'Caladea'">The difference in response time when a word is presented in Neutral vs. Positive context is not statistically significant [t(525)= -1.560, p= 0.2640].</SPAN>
+```{r}
+emmeans(mixed_model_1, pairwise ~ Condition)
+```
+## <SPAN STYLE="font-family:'Caladea'">Report the Final Results</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">Here, I am reporting the results of my linear mixed effects model-</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">A linear mixed effects analysis of the effect of word context (Positive, Neutral and Negative) on response time was carried out using R version 4.1.2 (R Core Team, 2021) and lme4 package (Bates, Maechler, Bolker, & Walker, 2015). Dummy coding was used for the experimental factor (Condition). Pairwise comparisons were conducted with the emmeans package (Lenth, 2021) in order to determine which level(s) of the factor differ from which other level(s). Below I have reported the regression coefficient estimates, standard errors, df, t-values, and p-values for the intercept and fixed effects. Degrees of freedom were approximated using the Kenward-Roger method. Restricted maximum likelihood estimation was used for the reporting of parameters.</SPAN> 
+
+<SPAN STYLE="font-family:'Caladea'">1)*Intercept:*</br> 
+Estimate=1086.50, Std. Error=75.42, df=45.21 , t value=14.407, p value=</br> 
+p <2e-16</br>
+2)*ConditionNeutral:*</br>
+Estimate=98.28, Std. Error=46.55, df=525.13, t value=2.111, p value=0.035234</br>
+3)*ConditionPositive:*</br>
+Estimate=170.80, Std. Error=46.49, df=525.09, t value=3.674,</br> 
+p value=0.000263</SPAN>
+
+
+
+
+## QUESTION 2 
+
+## <SPAN STYLE="font-family:'Caladea'">Reading in the Data</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">In this code chunk I have used the function `read_csv` to import my data into R. I have saved the data I read into R by creating a new object called **mixed_models_data2**.</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">This experiment involved a 2 x 2 repeated measures design where participants had to respond to a face that depicted either **Anger** or **Fear**. Each face was presented after a Story Vignette that described either an angry or fearful situation. There were 32 participants and 32 vignettes. In the following code chunks I have built a linear mixed effects model to determine whether the fixed factors of  **StoryEmotion** and **FaceExpression** influenced response time.</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">I visualized my data using the `head()` function which shows the first 6 lines of the dataset. The output showed that the columns *Subject*, *Vignette*, *StoryEmotion* and *FaceExpression* have been coded as characters. However, my experimental design involves *StoryEmotion* and *FaceExpression* as factors, hence in the next code chunk I will convert the *StoryEmotion* and *FaceExpression* columns into factors. Furthermore, I will build a linear mixed effects model in the following code chunks with Subject and Vignette as random effects. Therefore, in the next code chunk I will convert *Subject* and *Vignette* columns into factors as well.</SPAN>
+
+```{r, message=FALSE}
+mixed_models_data2 <- read_csv("assignment1_data2(1).csv")
+
+head(mixed_models_data2)
+```
+## <SPAN STYLE="font-family:'Caladea'">Converting the Variables into Factors </SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">In this code chunk I have converted the **Subject** column, **Vignette** column, **StoryEmotion** column and **FaceExpression** column into factors. In order to do so I used the `mutate` function from the `dplyr` package within `tidyverse`. The `mutate` function created a new *Subject* column, *Vignette* column, *StoryEmotion* column and *FaceExpression* column that had been coded as factors. I saved the output in a new object called **tidied_data**.</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">I used the `print()` function to display the output of **tidied_data**.</SPAN>
+```{r}
+tidied_data <- mixed_models_data2 %>%
+  mutate(Subject = factor(Subject), Vignette = factor(Vignette), RT = RT,
+            StoryEmotion = factor(StoryEmotion), FaceExpression = factor(FaceExpression))
+
+print(tidied_data)
+```
+
+## <SPAN STYLE="font-family:'Caladea'">Use `str()` function to Explore the Dataset</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">Here, I have used the `str` function to display the internal structure of the object *tidied_data* and explore the tibble in more detail. I can see that the columns *Subject*, *Vignette*, *StoryEmotion* and *FaceExpression* have been coded as factors. Further, it can be seen that the factor *StoryEmotion* has two levels, i.e., *Anger* and *Fear*. Similarly, the factor *FaceExpression* has two levels, i.e., *Anger* and *Fear*.</SPAN>
+```{r}
+str(tidied_data)
+```
+
+## <SPAN STYLE="font-family:'Caladea'">Summary Statistics 2</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">In this step I have calculated the summary statistics for my data. First, I saved my data in a new object called **summary_statistics2**. Next, I used the `group_by` function to group the dataset by the  **StoryEmotion** and  **FaceExpression**  columns.</SPAN> 
+<SPAN STYLE="font-family:'Caladea'">Subsequently, I used the `summarise` function to calculate the summary statistics for each level of StoryEmotion and  FaceExpression. Next, I calculated the mean response time, standard deviation of response time, median response time, minimum response time, maximum response time, 90% quantile for response time and the number of observations.  Finally, I used the `arrange` function to order the output by mean response time (highest to lowest). The mean response time for Anger(StoryEmotion)- Fear(FaceExpression) was the highest (mean= 2633.699 ms.) while the mean response time for Anger(StoryEmotion)-Anger(FaceExpression) was the lowest (mean= 1848.262 ms.).</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">I have used the `print()` function to display the output of **summary_statistics2**.</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">*Note, here that the code `options(pillar.sigfig = 5)` specifies the number of significant digits that will be printed*.</SPAN>
+
+
+```{r, message=FALSE}
+summary_statistics2 <- tidied_data %>%
+  group_by(StoryEmotion, FaceExpression) %>%
+  summarise(mean_RT = mean(RT), 
+            sd_RT = sd(RT),
+            median_RT= median(RT),
+            min_RT= min(RT),
+            max_RT= max(RT),
+            quantile_RT= quantile(RT, 0.9),
+            number=n()) %>%
+arrange(-mean_RT)
+
+options(pillar.sigfig = 5)
+
+print(summary_statistics2, width=Inf)
+```
+
+## <SPAN STYLE="font-family:'Caladea'">Visualizing the Missing Data</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">Here, I have used the `vis_miss` function (from `visdat` package) to check whether there is any missing data. The output confirmed that there is no missing data.</SPAN>
+
+```{r}
+vis_miss(tidied_data)
+
+```
+
+## <SPAN STYLE="font-family:'Caladea'">Data Visualization</SPAN>
+
+
+<SPAN STYLE="font-family:'Caladea'">This plot demonstrates the effect of *StoryEmotion* and *FaceExpression* on response time.  I have used the`ggplot2` package within `tidyverse` to make a violin plot including a box plot. The violin plot represents the distribution of the data, while the box plot shows the summary statistics.</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">For this visualization, I have used the **tidied_data** dataset. The function `ggplot` has been used to construct the initial plot. In the line of code following `ggplot` I used the syntax `StoryEmotion:FaceExpression` inside `aes()` to indicate that I want to plot all combinations of the two factors StoryEmotion and FaceExpression (i.e., the interactions) on the x axis, while the response time has been plotted on the y axis.</SPAN>
+<SPAN STYLE="font-family:'Caladea'">The `geom_violin()` function has been used to produce a violin plot. Subsequently, I have used the `geom_jitter` function to add a small amount of random variation to each point (the alpha value specified after `geom_jitter` refers to the opacity of the geom).</SPAN> 
+<SPAN STYLE="font-family:'Caladea'">The `geom_boxplot()` function has been used to create a box plot for the four conditions (Anger:Anger. Anger:Fear, Fear:Anger and Fear:Fear). In the line of code following `geom_boxplot()` I have specified `outlier.shape= NA` to hide the box plot outliers, I have also specified the width of the box plot and set the color of the box plot as black. The legend has been suppressed by specifying the `guides` function as none .The `stat_summary` function has been used to add some summary data such as the mean and confidence intervals around the mean. In the line of code that follows `stat_summary`, `fun.data`  is a complete summary function,and `mean_cl_boot` is used for producing bootstrapped confidence intervals without assuming normality. `theme_solarized()`  from the `ggthemes` package has been used for the plot. The `theme` function has been used to customize the text angle, size and horizontal adjustment (hjust) on the x and y axes as well as the plot title. Finally, the `labs` function has been used to add the x and y axes labels as well as the title of the plot.</SPAN>
+
+
+<SPAN STYLE="font-family:'Caladea'">From the visualization it can be seen that the response times for Anger:Anger and Fear:Fear show the least amount of variance as indicated by the narrowness of the violin plots.</SPAN>
+<SPAN STYLE="font-family:'Caladea'">For both Anger:Fear and Fear:Anger it can be seen that there are some data points of extremely high response time. From the summary statistics table (refer to **Summary Statistics 2** code chunk) it can be seen that the quantile response time for Anger:Fear is 4990.4 (ms.) and the quantile response time for Fear:Anger is 4906.0 (ms.) For Anger:Fear, it is evident that 90% of the participants had response times between minimum response time 659 (ms.) and quantile response time 4990.4 (ms.). Similarly, for Fear:Anger 90% of the participants had response time between minimum response time 499 (ms.) and quantile response time 4906.0 (ms.).</SPAN>
+
+
+```{r}
+tidied_data %>%
+ggplot(aes(x = StoryEmotion:FaceExpression, y = RT, colour = StoryEmotion:FaceExpression)) + 
+  geom_violin() +
+  geom_jitter(alpha = .2, width = .1) +
+  geom_boxplot(outlier.shape = NA, width= .07, color="black") +
+  guides(colour = 'none') + 
+    stat_summary(fun.data = mean_cl_boot, color = "black") +
+  theme_solarized()+
+   theme(axis.text.x = element_text(angle = 30, hjust = 0.9, size= 9, color= "black")) +
+  theme(axis.title.x = element_text(hjust = 0.4, size= 10, color= "black")) +
+  theme(axis.title.y = element_text(size= 10, color= "black")) +
+  theme(plot.title = element_text(size = 9, hjust= 0.5, color="black"))+
+  labs (title = "Examining the Effect of Story Emotion and Face Expression on Response Time", 
+       x = " Story Emotion x Face Expression", 
+       y = "Response Time (milliseconds)") 
+```
+
+
+## <SPAN STYLE="font-family:'Caladea'">Set the Contrast Coding of the Factors using Deviation Coding</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">In this code chunk, I have set the contrast coding of the factors (StoryEmotion and FaceExpression) using deviation coding. This will result in the Intercept of the model corresponding to the grand mean of the conditions (i.e., the mean of means) and makes the interpretation of the fixed effects (and any interaction effects) more straightforward. This will allow me to compare each of the conditions to the average of the other conditions.
+The default coding used by R is dummy (treatment) coding. However, dummy coding for factorial designs can be problematic as it can lead to misinterpretation of simple effects (e.g., an effect of Factor 2 at one level of Factor 1) as a main effect (e.g., an effect of Factor 2 at the average of Factor 1). Therefore, in order to address this problem I have used deviation coding.</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">Here, in the line of code following `contrasts` the expression `tidied_data$StoryEmotion` is the Base R way of referring to the variable called *StoryEmotion* in the dataset *tidied_data*. Similarly, the expression `tidied_data$FaceExpression` is the Base R way of referring to the variable called *FaceExpression* in the dataset *tidied_data*.
+I have rescaled the contrasts to values of (+.5) and (-.5). From the output of the `print` function it can be seen that for the factor **StoryEmotion** the first factor level (Anger) has been coded as (.5) and the second factor level (Fear) has been coded as (-.5). For the factor **FaceExpression** the first factor level (Anger) has been coded as (.5) and the second factor level (Fear) has been coded as (-.5).</SPAN>
+```{r}
+contrasts(tidied_data$StoryEmotion) <- matrix(c(.5, -.5))
+contrasts(tidied_data$FaceExpression) <- matrix(c(.5, -.5))
+
+print(contrasts(tidied_data$StoryEmotion))
+print(contrasts(tidied_data$FaceExpression))
+```
+
+## <SPAN STYLE="font-family:'Caladea'">Build the Linear Mixed Effects Model 2</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">Here, I have used the `lmer` function from the `lme4` package to build a linear mixed effects model. The line of code following the `lmer` function represents the syntax used by the `lmer` function for linear mixed effects models i.e.,- `lmer(RT ~ StoryEmotion * FaceExpression + (1 + StoryEmotion * FaceExpression | Subject) + (1 + StoryEmotion * FaceExpression | Vignette), data = tidied_data)`. Here, `RT` is the dependent variable, while `StoryEmotion` and `FaceExpression` are the factors.`StoryEmotion * FaceExpression` represents the fixed effect. The `~` symbol corresponds to predicted by. The terms `(1 + StoryEmotion * FaceExpression | Subject)` and `(1 + StoryEmotion * FaceExpression | Vignette)` tell the model to expect different intercepts for Subject and Vignette as well as differing slopes as a function of the interaction between the factors *StoryEmotion* and *FaceExpression*. The terms `(1 + StoryEmotion * FaceExpression | Subject)` and `(1 + StoryEmotion * FaceExpression | Vignette)` represent the random effects. The last part of the syntax `data= tidied_data` specifies the dataset I am using. 
+This is a maximal model in which I have tried to model the most complex random
+effects structure I can. The fixed effect `StoryEmotion * FaceExpression` corresponds to an effect of StoryEmotion, an effect of FaceExpression, and the interaction between the two.</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">The output of the dataset has been saved as a new object called **factorial_model**.</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">It is important to address that when I build my mixed model I get the warning `boundary (singular) fit: see ?isSingular`. This means that I might be trying to estimate more parameters than can be estimated using the dataset of the size I have. In other words, the model may be too complex and the dataset may not be rich enough for the model I am trying to build. A possible solution for this is to simplify the random effects structure until the warning goes away. This step has been carried out in the next code chunk.</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">I have used the `print()` function to print the output of **factorial_model**.</SPAN>
+```{r}
+factorial_model <- lmer(RT ~ StoryEmotion * FaceExpression + 
+                          (1 + StoryEmotion * FaceExpression | Subject) +
+                          (1 + StoryEmotion * FaceExpression | Vignette), 
+                        data = tidied_data)
+
+print(factorial_model)
+```
+## <SPAN STYLE="font-family:'Caladea'">Build A Simplified Linear Mixed Effects Model 2</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">In this code chunk I have simplified the random effects structure of my model by dropping the interaction term from both Subject and Vignette random effects. The terms `(1 | Subject)` and `(1 | Vignette)` represent the two random effects and indicate that I am modelling each Subject and each Vignette as having their own individual intercept. The rest of the syntax for building the linear mixed effects model is the same as what was done in the previous code chunk **Build the Linear Mixed Effects Model 2**. The output of the `lmer` function has been saved in a new object called **factorial_model_1**.</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">I have used the `print()` function to display the output of **factorial_model_1**.</SPAN>
+```{r}
+factorial_model_1 <- lmer(RT ~ StoryEmotion * FaceExpression + 
+                          (1 | Subject) +
+                          (1 | Vignette), 
+                        data = tidied_data)
+
+print(factorial_model_1)
+```
+
+## <SPAN STYLE="font-family:'Caladea'">Check the Model Assumptions</SPAN> 
+
+<SPAN STYLE="font-family:'Caladea'">In this code chunk I have used the `check_model()` function from within the `performance` package to check the model assumptions.</SPAN>
+<SPAN STYLE="font-family:'Caladea'">From the model assumptions graphs it looks like there is an issue with the normality of the residuals. The dots fall along the line apart from the right 20% of the residuals. Hence, while I am assuming that I am sampling from a roughly normal distribution that may not be true. I will try to build my model under a different distribution. This has been detailed in the following code chunks.</SPAN>
+```{r}
+check_model(factorial_model_1, panel=FALSE)
+```
+
+## <SPAN STYLE="font-family:'Caladea'">Plotting Other Distributions</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">Here, I have used the `descdist` function from within the `fitdistrplus` package to plot a Cullen and Frey graph which shows where the data actually lies. The code inside the parentheses uses the `$` operator which is used to extract a specific column from the dataset. On the basis of the graph, the data does not appear to follow the normal distribution but instead appears to follow the beta distribution. However, since there is no beta family under `glmer` (generalized linear mixed effects model) I will build a model that assumes that the data follows a gamma distribution. This has been carried out in the next code chunk.</SPAN>
+```{r}
+descdist(tidied_data$RT)
+```
+
+## <SPAN STYLE="font-family:'Caladea'">Build the Gamma Mixed Effects Model</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">Here, I have used the `glmer()` function from within the `lme4` package to build a generalized linear mixed model. In order to fit this model, I simplified the random effects terms as compared to what was used in **Build the Linear Mixed Effects Model 2** code chunk.I had to simplify the random effects terms by changing the interaction term `StoryEmotion * FaceExpression` to the additive effect of `StoryEmotion + FaceExpression`. The line of code following the `glmer()` function represents the syntax used by the `glmer()` function for generalized linear mixed effects models i.e.,- `glmer(RT ~ StoryEmotion * FaceExpression + (1 + StoryEmotion + FaceExpression | Subject) + (1 + StoryEmotion + FaceExpression | Vignette), family = Gamma, nAGQ = 0, data = tidied_data)`. Here, `RT` is the dependent variable, while `StoryEmotion` and `FaceExpression` are the factors. `StoryEmotion * FaceExpression` represents the fixed effect. The `~` symbol corresponds to predicted by. The terms `(1 + StoryEmotion + FaceExpression | Subject)` and `(1 + StoryEmotion + FaceExpression | Vignette)` tell the model to expect different intercepts for Subject and Vignette as well as differing slopes as a function of the additive effect of the factors StoryEmotion and FaceExpression. I have specified the `family` to be `Gamma` and set `nAGQ` (number of adaptive Gauss-Hermite quadrature points) to `0` (the default is 1). I had to set the `nAGQ` to zero as my code showed an error if the value was set at 1.  Since I have set the `nAGQ` to `0` it means that the parameter estimates are a little less exact than if I had set the default value.</SPAN>
+<SPAN STYLE="font-family:'Caladea'">Finally, the last part of the syntax specifies that the dataset used to build the model is `tidied_data`.</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">The output of the model has been saved as a new object called **gamma_factorial_model**.</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">I have used the `print()` function to display the output of **gamma_factorial_model**.</SPAN>
+```{r}
+gamma_factorial_model <- glmer(RT ~ StoryEmotion * FaceExpression + 
+                          (1 + StoryEmotion + FaceExpression | Subject) + 
+                          (1 + StoryEmotion + FaceExpression | Vignette), 
+                          family = Gamma,
+                          nAGQ = 0,
+                          data = tidied_data)
+
+print(gamma_factorial_model)
+```
+
+## <SPAN STYLE="font-family:'Caladea'">Generate the Summary of the Linear Mixed Effects Model</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">Here, I have used the `summary` function to generate the summary of my previously created **factorial_model_1**. Note, here that the Intercept corresponds to the grand mean of the Conditions (i.e., the mean of means). From the output it can be seen that the interaction between **StoryEmotion** and **FaceExpression** (`StoryEmotion1:FaceExpression1`) is significant [t(869.86)= -9.248, p <2e-16].</SPAN>
+
+```{r}
+summary(factorial_model_1)
+```
+
+## <SPAN STYLE="font-family:'Caladea'">Generate the Summary of the Gamma Mixed Effects Model</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">In this code chunk, I have used the `summary` function to generate the summary of my previously created **gamma_factorial_model**. Note, here that the Intercept corresponds to the grand mean of the Conditions (i.e., the mean of means). From the output it can be seen that the interaction between **StoryEmotion** and **FaceExpression** (`StoryEmotion1:FaceExpression1`) is not significant (p= 0.998). This is problematic because the interaction between **StoryEmotion** and **FaceExpression** was significant for the linear mixed effects model built using the `lmer` function (**factorial_model_1**). One reason for this could be that I had to simplify my random effects structure (as shown in the code chunk **Build A Simplified Linear Mixed Effects Model 2**) to build a model that converges (and does not generate the `boundary (singular) fit: see ?isSingular` warning). However, since the random effects only have random intercepts (i.e., no slopes) this increased the risk of Type 1 error (incorrect rejection of a true null hypothesis).</SPAN>
+<SPAN STYLE="font-family:'Caladea'">Additionally, the output of the Cullen and Frey graph (refer to code chunk **Plotting Other Distributions**) showed that the data appears to follow the beta distribution. However, since there is no beta family under `glmer()` I built a generalized linear mixed model that assumes that the data follows a gamma distribution. This could be another reason why the interaction between **StoryEmotion** and **FaceExpression** is not significant in the gamma model (as the data likely follows a beta distribution). Hence, the difference in results between the linear model(**factorial_model_1**) and the generalized linear model (**gamma_factorial_model**) could be because the data does not match a known distribution available to model under `glmer()`.</SPAN>
+```{r}
+summary(gamma_factorial_model)
+```
+
+
+## <SPAN STYLE="font-family:'Caladea'">Pairwise Comparisons for Linear Mixed Effects Model</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">In this code chunk, I will conduct pairwise comparisons (using the `emmeans()` function from within the `emmeans` package) in order to determine which level(s) of the factors (StoryEmotion and FaceExpression) differ from which other level(s). The line of code that follows `emmeans()` first denotes the dataset to be used and then indicates that pairwise is predicted by (`~`) `StoryEmotion * FaceExpression` i.e., the interaction between StoryEmotion and FaceExpression. Finally, the error correction adjustment used is `bonferroni`.</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">The output shows that the difference in response time is statistically significant when a story describing an angry situation is followed by a face expression depicting anger, i.e., Anger-Anger vs. when a story describing a fearful situation is followed by a face expression depicting anger, i.e., Fear-Anger (1848.262 ms. vs. 2524.817 ms., p <.0001). Therefore, participants' response time in Anger-Anger condition (mean RT= 1848.262 ms.) was significantly quicker as compared to Fear-Anger condition (mean RT= 2524.817 ms.).</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">The difference in response time is again statistically significant when a story describing an angry situation is followed by a face expression depicting anger, i.e., Anger-Anger vs. when a story describing an angry situation is followed by a face expression depicting fear, i.e., Anger-Fear (1848.262 ms. vs. 2633.699 ms.,p <.0001 ). Hence, participants response time in Anger-Anger condition (mean RT= 1848.262 ms.) was significantly faster as compared to Anger-Fear condition (mean RT= 2633.699 ms.).</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">The difference in response time is statistically significant when a story describing a fearful situation is followed by an angry face expression, i.e., Fear-Anger vs. when a story describing a fearful situation is followed by a fearful face expression, i.e., Fear-Fear (2524.817 ms. vs. 2027.631 ms., p <.0001).</SPAN>
+<SPAN STYLE="font-family:'Caladea'">Therefore, participants response time in Fear-Fear condition (mean RT= 2027.631 ms.) was significantly quicker as compared to Fear-Anger condition (mean RT= 2524.817 ms.).</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">Similarly, the difference in response time is statistically significant when a story describing an angry situation is followed by a fearful face expression, i.e., Anger-Fear vs. when a story describing a fearful situation is followed by a fearful face expression, i.e., Fear-Fear (2633.699 ms. vs. 2027.631 ms., p <.0001). Hence, participants response time in Fear-Fear condition (mean RT= 2027.631) was significantly quicker relative to Anger-Fear condition (mean RT= 2633.699 ms.).</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">Overall, it can be seen that when a like condition (Anger-Anger or Fear-Fear) is compared with an unlike condition (Anger-Fear or Fear-Anger) the difference in response time is statistically significant with response time being lower for like conditions as compared to unlike conditions.</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">It can be seen that the difference in response time is not statistically significant when a story describing an angry situation is followed by an angry face expression, i.e., Anger-Anger vs. when a story describing a fearful situation is followed by a fearful face expression, i.e., Fear-Fear (1848.262 ms. vs. 2027.631 ms., p=1.0000). Similarly, the difference in response time is not statistically significant when a story describing a fearful situation is followed by an angry face expression, i.e., Fear-Anger vs. when a story describing an angry situation is followed by a fearful face expression, i.e., Anger-Fear (2524.817 ms. vs. 2633.699 ms., p=1.0000).</SPAN>
+```{r}
+emmeans(factorial_model_1, pairwise ~ StoryEmotion * FaceExpression, adjust = "bonferroni")
+```
+
+## <SPAN STYLE="font-family:'Caladea'">Pairwise Comparisons for Gamma Mixed Effects Model</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">Here, I will conduct pairwise comparisons (using the `emmeans()` function from within the `emmeans` package) in order to determine which level(s) of the factors (StoryEmotion and FaceExpression) differ from which other level(s). The line of code that follows `emmeans()` first denotes the dataset to be used and then indicates that pairwise is predicted by (`~`) `StoryEmotion * FaceExpression` i.e., the interaction between StoryEmotion and FaceExpression. Finally, the error correction adjustment used is `bonferroni`.</SPAN>
+<SPAN STYLE="font-family:'Caladea'">From the output it can be seen that none of the comparisons are significant which is in contrast to the four significant comparisons found in the previous **Pairwise Comparisons for Linear Mixed Effects Model** code chunk. Nevertheless, I would be cautious in reporting the results of the gamma model since as explained in **Generate the Summary of the Gamma Mixed Effects Model** my data appears to follow the beta distribution, however, since there is no beta family under `glmer()` I built a generalized linear mixed model that assumes that the data follows a gamma distribution.</SPAN>
+<SPAN STYLE="font-family:'Caladea'">Hence, the difference in pairwise comparisons results between the linear mixed model(**factorial_model_1**) and the generalized linear mixed model (**gamma_factorial_model**) could be because the data does not match a known distribution available to model under `glmer()`.</SPAN>
+<SPAN STYLE="font-family:'Caladea'">Due to the aforementioned reasons I will report the results of my linear mixed effects model for my final write-up.</SPAN>
+```{r}
+emmeans(gamma_factorial_model, pairwise ~ StoryEmotion * FaceExpression, adjust = "bonferroni")
+```
+
+## <SPAN STYLE="font-family:'Caladea'">Reporting the Results</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">Here, I am reporting the results of my linear mixed effects model-</SPAN> 
+
+<SPAN STYLE="font-family:'Caladea'">A linear mixed effects analysis of the effect of ‘StoryEmotion’ and ‘FaceExpression’ on response time was carried out using R version 4.1.2 (R Core Team, 2021) and lme4 package (Bates, Maechler, Bolker, & Walker, 2015). Deviation coding was used for each of the two experimental factors (Barr et al., 2013). Pairwise comparisons were conducted with the emmeans package (Lenth, 2021) in order to determine which level(s) of the factors differ from which other level(s). Below I have reported the regression coefficient estimates, standard errors, df, t-values, and p-values for the intercept and fixed effects. Degrees of freedom were approximated using the Kenward-Roger method. Restricted maximum likelihood estimation was used for the reporting of parameters.</SPAN>
+
+<SPAN STYLE="font-family:'Caladea'">1)*Intercept:*                         
+Estimate=2289.70, Std. Error=211.50, df=32.01, t value=10.826,</br> 
+p value=3.12e-12</br>
+2)*StoryEmotion1:*</br>
+Estimate= -37.27, Std. Error=93.60, df=29.42, t value= -0.398,</br>
+p value= 0.6934</br>
+3)*FaceExpression1:*</br>
+Estimate= -121.60, Std. Error= 73.29, df=869.14, t value= -1.659,</br> 
+p value=0.0975</br>
+4)*StoryEmotion1:FaceExpression1:*</br>
+Estimate= -1360.55, Std. Error=147.13, df=869.86, t value= -9.248, p value=</br>
+p <2e-16</SPAN>
+
+
