@@ -1,0 +1,887 @@
+---
+title: "Hackathon_assignment"
+author: '10976294'
+date: "4/30/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load the Packages
+
+
+This is my Hackathon assignment. For this assignment I will build a regression model to predict house prices using the [publicly available Ames Housing Dataset](https://www.openintro.org/book/statdata/index.php?data=ames). 
+
+My research question is as follows-</br>
+*Research Question*- How do property size and neighborhood location affect the sale price of houses in Ames, Iowa?
+
+First, I will load my packages. The first package I have loaded is `tidyverse` which is a collection of R packages that work well together. The second package I have loaded is `corrr` which includes the `focus` and `correlate` function, used for conducting correlation. The third package I have loaded is `caret` which contains functions used to streamline the process for creating predictive models. The fourth package I have loaded is `ggthemes` which includes some extra geoms, scales and themes for `ggplot2`. The fifth package I have loaded is `corrplot` which is used to visualize a correlation matrix. The sixth package I have loaded is `lares` which includes the `corr_var` function used to correlate a whole dataframe with a single feature. The seventh package I have loaded is `car` which includes the `vif` function used to calculate the variance inflation factor. The eight package I have loaded is `effects` which is used for effect displays of linear, generalized linear and other models. The ninth package I have loaded is `leaps`  which contains the `regsubsets()` function used for model selection. The tenth package I have loaded is `lmtest` which includes the `bptest` function used to check for heteroscedasticity. Next, I have loaded the `hrbrthemes` package which is a combination of extra ggplot2 themes, scales and utilities. The final package I have loaded is `nlme` which includes the `gls` function used to fit a linear model with generalized least squares.
+
+```{r, message=FALSE, warning=FALSE}
+
+library(tidyverse)
+library(corrr)
+library(caret)
+library(ggthemes)
+library(corrplot)
+library(lares)
+library(car)
+library(effects)
+library(leaps)
+library(lmtest) 
+library(hrbrthemes) 
+library(nlme)
+
+```
+
+
+## Read in the Data
+
+Here, I have read in my data using the `read_csv` function. I have saved the output in a new object called **ames_housing_data**.
+According to the [Ames Housing Data Documentation](http://jse.amstat.org/v19n3/decock/DataDocumentation.txt), this dataset includes information from the Ames Assessor’s Office used in computing assessed values for individual residential properties sold in Ames, Iowa (from 2006 to 2010).
+```{r}
+
+ames_housing_data <- read_csv ("ames.csv", show_col_types=FALSE)
+
+```
+
+## View the Data
+
+Here, I have used the `head` function to view my data. The [Ames Housing Data Documentation](http://jse.amstat.org/v19n3/decock/DataDocumentation.txt) states that the Ames Housing data includes 82 columns with 23 nominal, 23 ordinal, 14 discrete, and 20 continuous variables.
+
+```{r}
+head(ames_housing_data)
+
+print(ames_housing_data, width = Inf)
+```
+
+## Check for Missing Data
+
+Here, I have used the `summarise_all` function (from `dplyr` package within `tidyverse`) to calculate the total number of missing values in the data.
+It appears that there are quite a few missing values, for instance *Alley* is missing 2732 values.
+In the next code chunk I will make a plot to visualize the missing values.
+
+
+```{r}
+housing_data_missing_values <- ames_housing_data %>% summarise_all(~ sum(is.na(.)))
+
+print(housing_data_missing_values, width=Inf)
+```
+## Plot the Missing Data
+
+Here, I have checked for missing values in *ames_housing_data*. `gather` function has been used to collect specific column names from `ames_housing_data` in order to place them in the `key` column, `key` and `value` represent the name of new key and value columns.
+ The `is.missing` function has been used to check for missing values, `summarise` function has been used to obtain the number of missing values, `arrange` function has been used to arrange the missing data in a descending order.
+The function `ggplot` has been used to construct the initial plot for the missing data. In the line of code following `ggplot`, `aes()` has been used to specify x axis as the missing values and y axis as the variables for the missing values.
+ `geom_col` has been used to make the heights of the bars represent values in the data, `coord_flip` has been used to flip the cartesian coordinates. `theme_solarized()`  from the `ggthemes` package has been used for the plot. The `theme` function has been used to suppress the legend, customize the text angle, size and horizontal adjustment (hjust) on the x and y axes as well as the plot title. Finally, the `labs` function has been used to add the x and y axes labels as well as the title of the plot.
+As mentioned in the previous code chunk, it appears that there are quite a few missing values in the dataset. For example, I can see that *Pool.QC (Pool Quality)* is missing 2917 values.
+However, according to the [Ames Housing Data Documentation](http://jse.amstat.org/v19n3/decock/DataDocumentation.txt), for some variables the designation 'NA' is not equivalent to 'not available'. For instance, in relation to *Pool.QC(Pool Quality)*, the designation 'NA' is equivalent to *No Pool*, similarly for *Alley*, the designation 'NA' is equivalent to *No Alley*.
+Hence, I cannot remove these values as missing data. Furthermore, by comparing the missing values output from the previous code chunk (refer to **Check for Missing Data**) I can see that the plot has not displayed variables with only one missing value. For instance, columns such as *Garage.Cars*, *Garage.Area* and *Total.Bsmt.SF* have one missing value each which has not been displayed in the graph.
+
+
+In the following code chunks I will conduct further analysis to check which variables will be included in the regression model and deal with NA's for each variable individually.
+
+```{r}
+ames_housing_data%>%
+  gather(key = "key", value = "val") %>% 
+  mutate(is.missing = is.na(val)) %>% 
+  group_by(key, is.missing) %>%
+  summarise(Missing.data = n())%>%
+  filter(is.missing == TRUE, Missing.data > 1) %>% 
+  select(-is.missing) %>%
+  arrange(desc(Missing.data)) %>% 
+  ggplot(aes(x = reorder(key, Missing.data), y = Missing.data, fill = key)) +
+  geom_col() +
+  coord_flip() +
+  theme_solarized()+
+  theme(axis.text.x = element_text(angle = 30, hjust = 0.9, size= 9, color= "black")) +
+  theme(axis.text.y = element_text(color= "black")) +
+  theme(axis.title.x = element_text(hjust = 0.4, size= 12, color= "black")) +
+  theme(axis.title.y = element_text(size= 12, color= "black")) +
+  theme(plot.title = element_text(size = 12, hjust= 0.5, color="black"))+
+  theme(legend.position='none')+
+  geom_text( aes( label = Missing.data), colour ="black", hjust = 1.0, size = 4.0)+
+  labs (title = "Missing Values in the Ames Housing Data", 
+       x = "Variables", 
+       y = "Missing Values") 
+  
+```
+
+## Determine the Correlation Between All Variables
+
+In this code chunk I will visualize a correlation matrix of variables that have a correlation significance of at least 0.5.
+
+This code has been adapted from an article published in *Towards Data Science (Williams, 2020)*.
+
+In the first line of code, I have created a new `function` and specified the dataset to use (`ames_housing_data`) as well as set the correlation significance at 0.5. Next, `mutate` function has been used to convert the data to numeric in order to run correlations, `mutate` has been used again to convert the data to factor (each value will become a number instead of turning into NA).`cor(housing_data_cor)` has been used to run a correlation. The line of code `corr[lower.tri(corr,diag = TRUE)] <- NA` is used to prepare the function to drop duplicates and correlations of 1. The code `corr[corr == 1] <- NA` has been used to drop perfect correlations of 1. 
+`corr <- as.data.frame(as.table(corr))` has been used to convert the output into a three column table and `na.omit` has been used to remove the missing values. Next, `subset` has been used to select the significant values and `order` has been used to sort by strongest correlation. The line of code following `reshape2::acast` has been used to convert the correlation table back into a matrix in order to plot it using `corrplot`. `corrplot` function (from `corrplot` package) has been used to make a correlation matrix with visualization `method` set as ellipse.
+
+I can notice how some variables are strongly correlated with each other, which could cause issues with multicollinearity if both of those variables would be included in the final model (in the correlation matrix, darker shades of red indicate a strong negative correlation, while the darker shades of blue indicate a strong positive correlation). 
+For example, *Order* (Order number is the ID given to a house) has a strong negative correlation with *Yr.Sold (Year Sold)* (-0.975).
+This negative correlation can be justified as lower ID numbers were assigned to houses listed for sale earlier.
+
+(*Note, multicollinearity refers to when an independent variable is highly correlated with one or more of the other independent variables in a multiple regression equation. Multicollinearity is a concern as it makes it difficult to differentiate between the effect of one variable and the effect of another*).
+```{r}
+corr_simple <- function(data = ames_housing_data,sig = 0.5){
+  housing_data_cor <- data %>% mutate_if(is.character, as.factor)
+  housing_data_cor <- housing_data_cor %>% mutate_if(is.factor, as.numeric)  
+  corr <- cor(housing_data_cor)
+  corr[lower.tri(corr,diag = TRUE)] <- NA 
+  corr[corr == 1] <- NA 
+  corr <- as.data.frame(as.table(corr))
+  corr <- na.omit(corr)   
+  corr <- subset(corr, abs(Freq) > sig) 
+  corr <- corr[order(-abs(corr$Freq)),]   
+  options(pillar.print_max = Inf)
+  print(corr)  
+  mtx_corr <- reshape2::acast(corr, Var1~Var2, value.var="Freq")
+  corrplot(mtx_corr, method='ellipse', tl.col="black", na.label=" ")
+}
+
+corr_simple()
+```
+
+## Determine the Correlation Between the Input Variables and the Output Variable
+
+Here, in order to run correlations, first I have selected the numeric variables from *ames_housing_data* and saved the output in a new object called **ames_numeric_data**. Next, I have used the `correlate` and `focus` functions (from `corrr` package) to determine the correlation between the input variables and the output variable (*SalePrice*). It appears that *Overall.Qual (Overall Quality)* has the strongest positive relationship with *SalePrice* (0.799). *PID (Parcel Identification Number)* has the strongest negative correlation with SalePrice (-0.247), however this variable is not of interest to me as I am not analyzing identification numbers and the correlation (with *SalePrice*) is weak.
+
+```{r}
+ames_numeric_data <- select_if(ames_housing_data, is.numeric)
+
+correlation_output_variable <-ames_numeric_data %>% correlate() %>% focus(SalePrice)
+
+
+options(pillar.print_max = Inf)
+print(correlation_output_variable)
+```
+## Plot the Correlation Between Input Variables and Output Variable
+
+Here, the `corr_var` function (from `lares` package) has been used to correlate an entire dataframe (`ames_numeric_data`) with a single variable (`SalePrice`), `max_pvalue` (used to filter non-significant variables) has been set as *0.05* and the top 5 strongest correlations have been displayed. As mentioned in the previous code chunk, *Overall.Qual (Overall Quality)* has the strongest positive relationship with *SalePrice* (0.799).
+
+The top 5 strongest correlations (with *SalePrice*) are-</br>
+1)*Overall.Qual(Overall Quality)(0.799)*</br>
+2)*Gr.Liv.Area(above grade (ground) living area)(0.707)*</br>
+3)*Garage.Cars(size of the garage in car capacity)(0.648)*</br>
+4)*Garage.Area(size of garage)(0.64)*</br>
+5)*Total.Bsmt.SF(Total square feet of basement area)(0.632)*</br>
+
+I will use the aforementioned 5 variables as input variables for my linear regression model due to their strong correlation with the output variable (*SalePrice*). Therefore, my input variables for the linear regression model are *Overall.Qual*, *Gr.Liv.Area*, *Garage.Cars*, *Garage.Area* and *Total.Bsmt.SF*, while the output variable is *SalePrice*.
+
+```{r, warning=FALSE}
+corr_var(ames_numeric_data, 
+         SalePrice,
+         max_pvalue = 0.05,
+         top = 5)
+
+```
+
+## Calculate Median House Price Per Neighborhood
+
+Apart from the previously reported top 5 strongest correlated numeric variables with the output variable *SalePrice*, I expect *SalePrice* to also be influenced by neighborhood location. In order to check this assumption I will calculate the median house price per neighborhood and plot it.
+
+Here, I have calculated the median house price for different neighborhoods. First, I saved my data in a new object called **neighborhood_median_price**. Next, I used the `group_by` function to group the dataset by the  **Neighborhood** column.
+Subsequently, I used the `summarise` function to calculate the median house price per neighborhood.  Finally, I used the `arrange` function to order the output by median house price (highest to lowest). It can be seen that the highest median house price is associated with Stone Brook (StoneBr) neighborhood ($319000). 
+In the next code chunk I will make a plot for median house price per neighborhood.
+
+(*Note, median house price has been used as it is less influenced by outliers than the mean*).
+```{r}
+
+neighborhood_median_price <- ames_housing_data %>% 
+group_by (Neighborhood) %>%
+  summarise(median_SalePrice= median(SalePrice)) %>%
+  arrange(-median_SalePrice)
+
+options(pillar.print_max = Inf)
+print(neighborhood_median_price)
+
+```
+
+## Plot Median House Price Per Neighborhood
+
+This visualization demonstrates the distribution of median house prices per neighborhood. I used the `geom_point` function (from`ggplot2` package within `tidyverse` ) to make a scatterplot in order to determine how house prices vary for different neighborhoods. In the line of code following `geom_point`, size indicates the size of the points in the plot, while alpha denotes the transparency of the points. I have used the **neighborhood_median_price** dataset for this visualization. The `labs` function has been used to add the x and y axes labels as well as the title of the plot. `theme_stata()` has been used for the plot. The `theme` function has been used to customize the text angle (vjust), size and horizontal adjustment (hjust) on the x and y axes as well as the plot title. 
+It can be seen that the highest median house price is for the neighborhood Stone Brook while the lowest median house price is for the neighborhood Meadow Village (MeadowV). Based on the output of the plot it is evident that house prices vary according to different neighborhoods. Hence, I will include the variable *Neighborhood* as an input variable in the linear regression model.
+
+(*Note, median house price has been used as it is less influenced by outliers than the mean*).
+```{r}
+neighborhood_median_price %>%
+ ggplot(aes(x = Neighborhood, y = median_SalePrice,  colour = Neighborhood)) + 
+  geom_point(size = 3, alpha = 0.9) +
+  labs(title= "Median House Price For Different Neighborhoods",
+       x = "Neighborhood", 
+       y = "Median House Price (in dollars)") +
+  theme_stata()+
+  guides(colour = 'none') + 
+  theme(plot.title = element_text(size = 10, hjust= 0.5, color="black")) +
+   theme(axis.text.x = element_text(hjust = 0.9, size= 9, angle=45)) +
+  theme(axis.title.x = element_text(hjust = 0.5, size= 10)) +
+  theme(axis.title.y = element_text(hjust = 0.5, size= 10)) +
+  theme(legend.title = element_text(size= 9))+
+  theme(legend.text = element_text(vjust= 0.6, size= 9)) +
+  theme(legend.position = "bottom") +
+  theme(text = element_text(size = 10)) 
+
+```
+
+
+## Rename the Variables
+
+In this code chunk, I have used the `rename` function from `dplyr` package within `tidyverse` to change the column names of the input variables (refer to code chunk *Plot Correlation Between Input Variables and Output Variable*) in order to give the columns a more descriptive name. The output variable *SalePrice* has also been renamed. (Note, that the column name of the input variable *Neighborhood* has not been changed).
+
+The column `Overall.Qual` has been renamed as `Overall_Quality`, the column`Gr.Liv.Area` has been renamed as `Above_Ground_Living_Area`, the `Garage.Cars` column has been renamed as`Garage_Car_Capacity`, the `Garage.Area` column has been renamed as ` Garage_Area`, the `Total.Bsmt.SF` column has been renamed as `Total_Basement_Area` and, the `SalePrice` column has been renamed as `Sale_Price`. The columns have been renamed for both datasets i.e., *ames_housing_data* and *ames_numeric_data* and their output has been saved in a new object called  *renamed_housing_data* and *renamed_numeric_housing_data* respectively. (*Note, I have not displayed the output of the renamed columns since it is quite large.*)
+
+With reference to the [Ames Housing Data Documentation](http://jse.amstat.org/v19n3/decock/DataDocumentation.txt), I have included a description of the input variables and the output variable *Sale_Price*-</br>
+1)*Overall_Quality*- Rates the overall material and finish of the house. The range is from 1 (very poor) to 10 (very excellent).</br>
+2)*Above_Ground_Living_Area*- Above ground living area (square feet).</br>
+3)*Garage_Car_Capacity*-Size of garage in car capacity.</br>
+4)*Garage_Area*- Size of garage in square feet.</br>
+5)*Total_Basement_Area*- Total square feet of basement area.</br>
+6)*Sale_Price*- Sale price in dollars.</br>
+7)*Neighborhood*- Physical locations within Ames city limits.</br>
+
+
+```{r}
+renamed_housing_data <- ames_housing_data %>%
+  rename(Overall_Quality=Overall.Qual, Above_Ground_Living_Area=Gr.Liv.Area, Garage_Car_Capacity= Garage.Cars,  Garage_Area=Garage.Area, Total_Basement_Area=Total.Bsmt.SF, Sale_Price=SalePrice)
+
+renamed_numeric_housing_data <- ames_numeric_data %>%
+  rename(Overall_Quality=Overall.Qual, Above_Ground_Living_Area=Gr.Liv.Area, Garage_Car_Capacity= Garage.Cars,  Garage_Area=Garage.Area, Total_Basement_Area=Total.Bsmt.SF, Sale_Price=SalePrice)
+
+head(renamed_housing_data)
+```
+
+## Repair The Missing Values
+
+As mentioned in the code chunk **Plot the Missing Data**, the variables `Garage_Car_Capacity`,`Garage_Area`, and `Total_Basement_Area` each have one missing value. Here, I have recoded the 'NA' for these variables as 0. The other variables of interest, i.e., *Overall_Quality*, *Above_Ground_Living_Area*, *Sale_Price* and *Neighborhood* do not have any missing values.
+
+First, I created a temporary subset of the list of variables that need to be recoded, i.e, `Garage_Car_Capacity`,`Garage_Area`, and `Total_Basement_Area`. The output has been saved in an object called **x**. Next the object **x** has been converted to a matrix and the NA values replaced with 0. Subsequently, the object **x** was converted back to a data frame.`names` function has been used to get the list of objects in *renamed_housing_data* and saved as an object called *recoded_variables*. In the next line of code the specified variables (*Garage_Car_Capacity*,*Garage_Area*, and *Total_Basement_Area*) in the object *recoded_variables* have been removed and the output has been saved as a new object called **housing_data_reduced**. Finally, the output from *housing_data_reduced* has been combined with the previously created **x** object using the function `bind_cols` and saved as a new object called **housing_data_updated**.
+
+```{r}
+
+x<- renamed_housing_data[c('Garage_Car_Capacity','Garage_Area', 'Total_Basement_Area')] 
+
+x=as.matrix(x)
+x[is.na(x)] <-"0"
+x=as.data.frame(x)
+
+recoded_variables <- names(renamed_housing_data) %in% c("Garage_Car_Capacity", "Garage_Area", "Total_Basement_Area")
+
+housing_data_reduced <- renamed_housing_data[!recoded_variables] 
+
+housing_data_updated<- bind_cols(housing_data_reduced, x )
+
+```
+
+## Confirm Missing Values Have Been Repaired
+
+Here, in order to check if the NA's have been successfully recoded as 0 in the previous code chunk (refer to *Repair The Missing Values*) I have used the `which` function to check if *housing_data_updated* has any missing values for the variables *Garage_Car_Capacity*,*Garage_Area*, and *Total_Basement_Area*. The output shows that neither of the three variables have any missing values.
+
+```{r}
+which(is.na(housing_data_updated$Garage_Car_Capacity))
+which(is.na(housing_data_updated$Garage_Area))
+which(is.na(housing_data_updated$Total_Basement_Area))
+```
+
+
+## Check the Data Type of Variables
+
+Here, I have checked the data type of my input variables to determine if they have been coded correctly. The variables *Overall_Quality*, *Above_Ground_Living_Area* and *Sale_Price* have been correctly coded as double data type. However, the variable *Neighborhood* has been incorrectly coded as character and should be coded as a factor instead. Similarly, the variables *Garage_Car_Capacity*, *Garage_Area* and *Total_Basement_Area* have been coded as characters but should be coded as double data type.
+
+```{r}
+typeof(housing_data_updated$Overall_Quality)
+
+typeof(housing_data_updated$Neighborhood)
+
+typeof(housing_data_updated$Garage_Car_Capacity)
+
+typeof(housing_data_updated$Garage_Area)
+
+typeof(housing_data_updated$Total_Basement_Area)
+
+typeof(housing_data_updated$Above_Ground_Living_Area)
+
+typeof(housing_data_updated$Sale_Price)
+```
+
+
+## Recode the Data Type of Variables
+
+Here, I have recoded the variable *Neighborhood* as a factor. The variables *Garage_Car_Capacity*, *Garage_Area* and *Total_Basement_Area* have been coded as double data type.
+
+```{r}
+housing_data_updated$Neighborhood <- as.factor(housing_data_updated$Neighborhood)
+
+housing_data_updated$Garage_Car_Capacity <- as.double(housing_data_updated$Garage_Car_Capacity)
+
+housing_data_updated$Garage_Area <- as.double(housing_data_updated$Garage_Area)
+
+housing_data_updated$Total_Basement_Area <- as.double(housing_data_updated$Total_Basement_Area)
+```
+
+## Confirm the Data Type of Variables
+
+Here, I have confirmed that the data type of my variables has been successfully recoded.
+
+```{r}
+class(housing_data_updated$Neighborhood)
+
+class(housing_data_updated$Garage_Car_Capacity)
+
+class(housing_data_updated$Garage_Area)
+
+class(housing_data_updated$Total_Basement_Area)
+```
+
+
+## Check Contrasts
+
+Here, I have checked the contrasts for my factor variable *Neighborhood* to determine if it can be included in the linear regression model.
+I can see that R has used dummy coding for the categorical variable *Neighborhood* automatically, hence the variable can be included in the linear regression model without any further modification.
+
+```{r}
+contrasts(housing_data_updated$Neighborhood)
+```
+
+## Build the Linear Regression Model
+
+Here, I have built a linear regression model using the `lm` function. The line of code following `lm` indicates that the output variable `Sale_Price` is predicted by (`~`) `Overall_Quality` + `Neighborhood` + `Garage_Area` + `Garage_Car_Capacity` + `Total_Basement_Area` + `Above_Ground_Living_Area`. The dataset used to build the model is `housing_data_updated`. The output of the model has been saved as a new object called **linear_model**.
+
+From the summary output of the model it can be seen that the input variables *Garage_Area (p <0.001)*, *Garage_Car_Capacity (p=0.008)*, *Total_Basement_Area (p <0.001)* and *Above_Ground_Living_Area (p <0.001)* are significant predictors. Only some levels of the input variable *Neighborhood* are significant. However, I will keep all levels of the *Neighborhood* variable in the model as dropping predictors (or category levels) because they are not significant leads to biased estimates for regression coefficients (Harrell et al. 2015).
+
+R-squared (R2) is a measure of the goodness of fit of a model. R2 measures the variation that is explained by a regression model (higher R2  values indicate that the model is a good fit, R2 range is from 0 to 1) . Adjusted R-squared (Adjusted R2) refers to a modified version of R2 which has been adjusted for the number of predictors in the model.There is an increase in the Adjusted R2 value when a new input term improves the model more than would be expected by chance.
+The Adjusted R2 value for the *linear_model* is *0.8216*.
+
+```{r}
+set.seed(123)
+
+linear_model <- lm(Sale_Price~ Overall_Quality + Neighborhood +Garage_Area +Garage_Car_Capacity + Total_Basement_Area + Above_Ground_Living_Area,  data=housing_data_updated)
+
+summary(linear_model)
+
+```
+
+## Plot `Sale_Price` vs. `Above_Ground_Living_Area`
+
+According to the [Ames Housing Data Documentation](http://jse.amstat.org/v19n3/decock/DataDocumentation.txt) there are 5 outliers in the dataset which can be viewed from a plot of *Sale_Price* vs. *Above_Ground_Living_Area*. Indeed, from the plot below it is evident that there are 5 outliers in the data. The Ames Housing Data Documentation states that three of these observations are true outliers (partial sales that likely do not represent actual market value). From the plot it can be seen that these three observations have a large above ground living area and yet a low sale price.
+The Data Documentation states that two of the outliers are unusual sales (very large houses priced relatively appropriately). From the plot it can be seen that there are two observations close to a sale price of 700,000 dollars.
+The Data Documentation recommends that these observations be removed as outliers from the data. 
+
+Here, I have used the `plot` function to visualize the relationship between *Sale_price* and *Above_Ground_Living_Area*. The code `options(scipen = 100)` has been used to turn off scientific notation to make the graph more readable.
+In the line of code that follows `plot()` *Sale_Price* has been plotted on the y axis while *Above_Ground_Living_Area* has been plotted on the x axis. `pch` is the standard argument to set the character that will be plotted.
+It appears that there is a linear relationship between the two variables apart from the 5 outlier observations mentioned earlier.
+
+```{r}
+options(scipen = 100)
+
+plot(x=housing_data_updated$Above_Ground_Living_Area, y= housing_data_updated$Sale_Price, xlab = "Above Ground Living Area (square feet)", ylab="Sale Price (in dollars)", pch=21, bg="blue", main="Relationship Between Sale Price and Above Ground Living Area")
+
+```
+
+## Remove Outliers
+
+As mentioned in the previous code chunk, the [Ames Housing Data Documentation](http://jse.amstat.org/v19n3/decock/DataDocumentation.txt) recommends removing outlier observations from the dataset which correspond to any houses with more than 4000 square feet. In order to do so I have used the `which` function to identify houses with above ground living area greater than 4000 square feet and removed them from the dataset. The output has been saved as a new object called **housing_data_revised**.
+
+
+```{r}
+housing_data_revised=housing_data_updated[-which(housing_data_updated$Above_Ground_Living_Area>4000 & housing_data_updated$Sale_Price < 800000),]
+
+```
+
+## Summary Statistics for Output Variable
+
+Here, I have calculated the summary statistics for the output variable *Sale_Price* using the dataset without outliers (`housing_data_revised`). It can be seen that the price range is between $12789 and $625000. The mean sale price is $180412, while the median sale price is $160000.
+
+```{r}
+summary(housing_data_revised$Sale_Price)
+```
+
+## Compare Median Sale Price for Dataset With and Without Outliers
+
+Here, I want to compare the median sale price for the dataset with outliers, i.e., `ames_housing_data` and the dataset without outliers `housing_data_revised`. I can see below that the median sale price for `ames_housing_data` is $160000 which is the same as the median sale price obtained in the previous code chunk for `housing_data_revised` (dataset without outliers). I wanted to make this comparison since I have previously made a plot of median sale price per neighborhood using `ames_housing_data` (dataset with outliers). However, I wanted to confirm here that median is less affected by outliers and hence my previous graph is still accurate (refer to code chunk *Plot Median House Price Per Neighborhood*).
+ 
+
+```{r}
+summary(ames_housing_data$SalePrice)
+```
+
+
+## Plot the Output Variable
+
+Here, I have made a histogram showing the distribution of the output variable *Sale_Price* using the dataset without outliers, i.e., `housing_data_revised`.
+The `ggplot` function has been used to initiate the plot and `Sale_Price` has been plotted on the x axis. `geom_histogram` has been used to create a histogram plot, the fill color of the bins has been specified as well as the number of bins.`theme_ipsum()` has been used for the plot. The legend has been suppressed by specifying the `guides` function as none. The `theme` function has been used to customize the text size and horizontal adjustment (hjust) on the x and y axes as well as the plot title. Finally, the `labs` function has been used to add the x and y axes labels as well as the title of the plot. 
+From the histogram it can be seen that the distribution of house prices is right-skewed with most houses being under a price range of $200,000.
+
+```{r, warning=FALSE}
+housing_data_revised%>%
+ggplot(aes(x = Sale_Price)) +
+  geom_histogram(color="black", fill = "purple", bins = 50) +
+  theme_ipsum()+
+  guides(colour = 'none') + 
+  theme(axis.text.x = element_text(hjust = 0.5, size= 10, color="black")) +
+  theme(axis.title.x = element_text(hjust = 0.5, size= 11, color="black")) +
+  theme(axis.text.y = element_text(hjust = 0.5, size= 10, color="black")) +
+  theme(axis.title.y = element_text(hjust = 0.5,size= 11, color="black")) +
+  theme(plot.title = element_text(size = 11, hjust= 0.5))+
+  labs (title = "House Sale Price Frequency Distribution ", 
+       x = " Sale Price (in dollars)", 
+       y = "Frequency")
+
+```
+
+
+## Build the Linear Regression Model- Attempt 2
+
+Here, I have built the linear model again after removing the outliers from the data. The output has been saved as a new object called **linear_model2**.
+
+The Adjusted R2 value of **linear_model2** is *0.8481* which is higher than the Adjusted R2 value of **linear_model** (*Adjusted R2=0.8216*) (*linear_model* was built with the dataset including outliers). Hence, removing outliers from the dataset has led to an improvement in the Adjusted R2 value. From the summary of the model it can be seen that the input variable *Garage_Car_Capacity* is no longer a significant predictor (p=0.716) after removing the outliers. 
+
+```{r}
+set.seed(123)
+
+linear_model2 <- lm(Sale_Price~ Overall_Quality + Neighborhood +Garage_Area  +Garage_Car_Capacity + Total_Basement_Area + Above_Ground_Living_Area,  data=housing_data_revised)
+
+summary(linear_model2)
+```
+
+
+## Check the Variance Inflation Factor
+
+In this code chunk, I have used the `vif()` function (from the `car` package) to determine the variance inflation factor.
+
+In regression analysis, a variance inflation factor (VIF) is used to check for the presence of multicollinearity. Multicollinearity exists when an input variable is highly correlated with one or more of the other input variables, thereby undermining the statistical significance of an input variable.
+The VIF measures the extent to which the variance of a regression coefficient is inflated due to multicollinearity in the model. VIF values greater than 5 are generally regarded as high (James et al., 2021).
+
+The GVIF values for the variables *Garage_Area* (GVIF=5.64) and *Garage_Car_Capacity* (GVIF=6.05) are over 5 indicating that multicollinearity likely exists between the two variables. I will check for this further in the following code chunks. The GVIF values for the other input variables are low indicating a low correlation among the variables.
+```{r}
+vif(linear_model2)
+```
+
+
+## Check for Multicollinearity Between Variables
+
+Here, I have used the `cor` function to check the correlation between *Garage_Area* and *Garage_Car_Capacity*. The correlation between the two variables is strong (0.89) which explains the high GVIF value obtained for these variables earlier (refer to code chunk *Check the Variance Inflation Factor*). 
+The presence of multicollinearity makes it difficult for the model to estimate the relationship between each input variable and the dependent variable in an independent manner because the input variables tend to change in unison. Hence, I have decided to remove the input variable *Garage_Car_Capacity* from my model to reduce multicollinearity.
+```{r}
+set.seed(123)
+
+cor(housing_data_revised$Garage_Area, housing_data_revised$Garage_Car_Capacity)
+
+```
+
+## Build the Linear Regression Model- Attempt 3
+
+Here, I have built the linear model again after removing the input variable *Garage_Car_Capacity* from the model. The output has been saved as a new object called **linear_model3**.
+
+The Adjusted R2 value of **linear_model3** is *0.8482* which is higher than the Adjusted R2 value of **linear_model2** (*Adjusted R2=0.8481*) (*linear_model2* included the variable *Garage_Car_Capacity*). While the difference between the two values is small, the increase in Adjusted R2 for *linear_model3* indicates that the model is a good fit with the current set of predictors.
+
+```{r}
+set.seed(123)
+
+linear_model3 <- lm(Sale_Price~ Overall_Quality + Neighborhood +Garage_Area + Total_Basement_Area + Above_Ground_Living_Area,  data=housing_data_revised)
+
+summary(linear_model3)
+
+```
+
+
+## Re-Check Variance Inflation Factor
+
+Here, I have re-checked the GVIF values for  *linear_model3* (after removing the input variable *Garage_Car_Capacity*. The GVIF values for the input variables are low indicating a low correlation among the variables.
+
+```{r}
+vif(linear_model3)
+```
+
+
+## Diagnostic Plots for Linear Model3
+
+Here, I have applied the `plot()` function to `linear_model3` which produces four diagnostic plots.
+
+The `par()` and `mfrow()` functions tell R to split the display screen into separate panels and allows me to view all four plots together. For instance, par(mfrow = c(2, 2)) divides the plotting region into a 2×2 grid of panels.
+From the residuals vs. fitted plot it can be seen that the red line is linear, indicating that the residuals meet the assumption about being normally distributed (James et al., 2021). The Scale-Location plot (used to check for heteroscedasticity) if of concern to me since it appears that the variance of the residuals is unequal for all fitted values and the assumption of homoscedasticity is not met.
+```{r}
+par(mfrow = c(2, 2))
+plot(linear_model3)
+
+```
+
+
+## Check for Heteroscedasticity
+
+Based on the Scale-Location diagnostic plot seen in the previous code chunk it is possible that there is heteroscedasticity in the data. Hence, I will perform a Breusch-Pagan Test to check for the presence of heteroscedasticity in the data.
+I have used the `bptest` function (from `lmtest` package) to check for heteroscedasticity. The p-value obtained is close to zero indicating the presence of heteroscedasticity in my model. I will keep the presence of heteroscedasticity in mind as I further refine my model.
+
+```{r}
+bptest(linear_model3)
+```
+
+
+## Plot the Data for Input Variable `Overall_Quality`
+
+Here, I will plot the input variable *Overall_Quality* to check the relationship between *Overall_Quality* and *Sale_Price*. In order to do so I will plot *Overall_Quality* to view the fitted effect with partial residuals. 
+The output of the plot shows the models prediction and 95% confidence bands in blue, whereas the partial residuals are represented as pink circles. It appears that the sale price increases as the overall quality of the house increases. 
+
+The general shape in the data is shown by the pink line (using a LOESS smoothing method). The degree to which the blue model fit matches the pink line suggests that the correct shape of the relationship has likely been captured. 
+
+*Note, in the code chunks that follow, I have used a similar approach to plot the other input variables (Garage_Area, Total_Basement_Area and Above_Ground_Living_Area). However, a plot for input variable 'Neighborhood' has not been made below, since a similar plot has been made previously(refer to code chunk 'Plot Median House Price Per Neighborhood').*
+```{r, warning=FALSE}
+set.seed(123)
+
+lm.fit_overall_quality <- lm(Sale_Price~ Overall_Quality , data=housing_data_revised)
+
+plot(effect("Overall_Quality", mod=lm.fit_overall_quality, partial.residuals=TRUE), xlab="Overall Quality of House", ylab="Sale Price (in dollars)", main="Overall Quality Effect Plot")
+
+```
+
+
+## Plot the Data for Input Variable `Garage_Area`
+
+As mentioned in the previous code chunk (refer to code chunk *Plot the Data for Input Variable `Overall_Quality`*) I have made a plot for the input variable `Garage_Area` to determine the relationship between *Garage_Area* and *Sale_Price*. It appears that sale price increases as garage area increases.
+The degree to which the blue model fit matches the pink line suggests that the correct shape of the relationship has likely been captured.
+
+```{r}
+set.seed(123)
+
+
+lm.fit_garage_area <- lm(Sale_Price~ Garage_Area , data=housing_data_revised)
+
+plot(effect("Garage_Area", mod=lm.fit_garage_area, partial.residuals=TRUE), xlab="Garage Area (square feet)", ylab="Sale Price (in dollars)", main="Garage Area Effect Plot")
+
+```
+
+
+## Plot the Data for Input Variable `Total_Basement_Area`
+
+As mentioned in the previous code chunk (refer to code chunk *Plot the Data for Input Variable `Overall_Quality`*) I have made a plot for the input variable `Total_Basement_Area` to determine the relationship between *Total_Basement_Area* and *Sale_Price*. It appears that sale price increases as total basement area increases.
+The degree to which the blue model fit matches the pink line suggests that the correct shape of the relationship has likely been captured.
+
+```{r}
+set.seed(123)
+
+lm.fit_basement_area <- lm(Sale_Price~ Total_Basement_Area , data=housing_data_revised)
+
+plot(effect("Total_Basement_Area", mod=lm.fit_basement_area, partial.residuals=TRUE), xlab="Total Basement Area (square feet)", ylab="Sale Price (in dollars)",main="Total Basement Area Effect Plot")
+
+```
+
+
+## Plot the Data for Input Variable `Above_Ground_Living_Area`
+
+As mentioned in the previous code chunk (refer to code chunk *Plot the Data for Input Variable `Overall_Quality`*) I have made a plot for the input variable `Above_Ground_Living_Area` to determine the relationship between *Above_Ground_Living_Area* and *Sale_Price*. It appears that sale price increases as above ground living area increases.
+The degree to which the blue model fit matches the pink line suggests that the correct shape of the relationship has likely been captured.
+
+```{r}
+set.seed(123)
+
+lm.fit_living_area <- lm(Sale_Price~ Above_Ground_Living_Area , data=housing_data_revised)
+
+plot(effect("Above_Ground_Living_Area", mod=lm.fit_living_area, partial.residuals=TRUE), xlab="Above Ground Living Area (square feet)", ylab="Sale Price (in dollars)", main="Above Ground Living Area Effect Plot")
+
+
+```
+
+## Split the Data into Training and Test Set
+
+In the following code chunks I will split the data into training and test set to build my model, perform best subset selection and cross-validation. 
+
+Here, I have used the `createDataPartition` function (from `caret` package) to split the data into training (80%) and test datasets (20%). The benefit of using the function `createDataPartition()` is that it tries to ensure a split that has a similar distribution of the supplied variable in both datasets. The training dataset is used to build the model, whereas the test dataset is an unseen dataset used to evaluate the model performance.
+
+I have built my linear regression model (saved as object called **model_regression**) using the training dataset. Subsequently, I have used the `predict` function to obtain model predictions for the linear model (using the test dataset, i.e., `testing_dataset_regression`).
+Next, I have derived the model performance metrics such as R2, Root Mean Square Error (RMSE) and Mean Absolute Error (MAE) for the linear model.
+
+I have included a brief description of the performance metrics-</br>
+1) *R2*- R2 is a measure of the goodness of fit for linear regression models.
+It refers to the amount of variance in the dependent variable that is collectively explained by the independent variables (higher R2 values indicate that the model is a good fit).</br>
+2)*RMSE*- RMSE refers to the average distance between the predicted values from the model and the actual values in the dataset (lower RMSE values indicate better fit).</br>
+3)*MAE*- MAE refers to the mean of the absolute values of each prediction error on all instances of the test dataset. Prediction error is the difference between the actual value and the predicted value for that instance (lower MAE values are better).</br>
+
+The model performance metric values for the linear model are-</br>
+1)R2 = 0.858</br> 
+2)RMSE = 30481.13</br> 
+3)MAE = 19674.34</br>
+
+(**Note, here that RMSE uses the same unit of measurement as the dependent variable, therefore the RMSE value can be read as 30481 dollars. Considering the range of the data, this RMSE value can be considered relatively low.**)
+
+
+
+```{r}
+set.seed(123)
+
+random_sample_regression <- createDataPartition(housing_data_revised$Sale_Price, p=0.8, list=FALSE)
+
+training_dataset_regression <- housing_data_revised[random_sample_regression,]
+
+testing_dataset_regression <- housing_data_revised[-random_sample_regression,]
+
+model_regression <-lm(Sale_Price~ Overall_Quality + Neighborhood +Garage_Area + Total_Basement_Area + Above_Ground_Living_Area, data = training_dataset_regression)
+
+
+predictions_regression <- predict(model_regression, testing_dataset_regression)
+
+
+model_performance_metrics <- data.frame(R2= R2(predictions_regression, testing_dataset_regression$Sale_Price),
+           RMSE= RMSE(predictions_regression, testing_dataset_regression$Sale_Price),
+           MAE = MAE(predictions_regression, testing_dataset_regression$Sale_Price))
+
+
+
+print(model_performance_metrics)
+
+```
+
+## Generate the Summary of `model_regression`
+
+Here, I have generated the summary of the previously created *model_regression*. The Adjusted R2 value for the model is *0.8458*. 
+
+The coefficients obtained from the summary output indicate the impact of each variable on the sale price of a house. The coefficient indicates how much *Sale_Price* changes when everything else is held constant and the variable changes by one unit. Hence, positive coefficients indicate variables that have a positive correlation with *Sale_Price*, while negative coefficients indicate variables that have a negative correlation with *Sale_Price*.
+For instance when *Overall_Quality* increases by 1, the sale price is expected to increase by $17202. Therefore, it is evident that better quality houses are worth more. 
+Similarly when *Garage_Area*, *Total_Basement_Area* and *Above_Ground_Living_Area* increase by 1, the sale price is expected to increase by $43, $34 and $50 respectively. Hence, as property size increases the sale price of the house also increases. Additionally, the p-values obtained for all 3 variables are close to zero (p <0.001) indicating that the relationship obtained between the predictor and the dependent variable is not due to chance. For the factor variable *Neighborhood*, the different levels of the variable can be compared against the intercept.The p-value for the overall model is also significant (p <0.001).  
+
+It can be seen that the intercept is negative (-62816.72),indicating that if all values corresponding to the input variables would be 0, the sale price of the house would be negative. However, this is unlikely, since if the above ground living area of a house were to be 0 there would not be a house to sell.
+
+
+*Note, 'Bloomington Heights (Blmngtn)' (a level of variable 'Neighborhood') has been set as intercept due to default alphabetic coding in R.*
+ 
+```{r}
+summary(model_regression)
+```
+
+## Best Subset Selection 
+
+The best subsets selection method involves considering all possible combinations of the predictor variables in order to find the subset of predictor variables that best predict the output variable.
+
+Here, I have used the `regsubsets()` function (from the `leaps` package) to perform best subset selection. The function identifies the best model (containing a given number of predictors), where best is quantified using residual sum of squares (RSS- used to measure the amount of variance in the data which is not explained by the regression model).
+
+The syntax followed by the `regsubsets()` function is the same as used for the `lm()` function. 
+The output of the `summary()` command displays the best set of variables for each model size (James et al., 2021). I have saved the output of `regsubsets` function as a new object called *regfit.full*.
+
+An asterisk indicates that a given variable is included in the corresponding model. For instance, this output indicates that the best two-variable model contains *Overall_Quality* and *Above_Ground_Living_Area*. The best four variable model contains *Overall_Quality*, *Above_Ground_Living_Area*, *Total_Basement_Area* and *Garage_Area*. The best 8 variable model contains additionally the following levels of *Neighborhood* variable -Northridge Heights (NridgHt), Stone Brook (StoneBr), Old Town (OldTown) and Northridge (NoRidge).
+
+While, all levels of the *Neighborhood* variable can not be included in the best 8 variables model, I will still retain them in my model. This is because for categorical predictors where a particular set of parameters are significant, the significance of the parameters depends on the contrasts/reference level used in the model. Removing specific levels of a categorical predictor would likely be considered bad statistical practice (James et al., 2021).
+
+```{r}
+set.seed (123)
+
+regfit.full <- regsubsets(Sale_Price~ Overall_Quality + Neighborhood +Garage_Area + Total_Basement_Area + Above_Ground_Living_Area, data = training_dataset_regression)
+
+reg.summary <- summary(regfit.full)
+
+print(reg.summary)
+
+```
+
+
+## Display the Selected Variables for BIC
+
+The Bayesian Information Criterion (BIC) refers to an index used in Bayesian statistics in order to choose between two or more alternative models (models with lower BIC are preferred).
+
+
+Here, I have applied the built-in `plot` command from the `regsubsets()` function to the previously created object *regfit.full* (refer to code chunk *Best Subset Selection*) in order to display the selected variables for the best model with a given number of predictors (ranked according to the BIC, Cp or R2) (James et al., 2021). The top row of each plot contains a black square for each variable selected according to the optimal model associated with that statistic.
+
+Two models share a BIC value of -4100. The model with the smaller number of predictor variables includes the following predictors- 
+*Overall_Quality*, *Northridge Heights*, *Old Town*, *Stone Brook*, *Garage_Area*,*Total_Basement_Area* and *Above_Ground_Living_Area*
+
+**Note, here that 'Northridge Heights', 'Old Town' and 'Stone Brook' are three levels of the 'Neighborhood' variable. While the rest of the levels of the *Neighborhood* variable were not included in the model with the lowest BIC, I will retain them in my model since dropping some levels of a categorical variable is bad statistical practice (James et al., 2021) (refer to explanation in code chunk 'Best Subset Selection').**
+
+```{r}
+plot(regfit.full, scale = "bic")
+```
+
+## Display the Selected Variables for Mallows' Cp
+
+Mallows' Cp is used to pick between multiple regression models as it compares the precision and bias of the full model to models with a subset of the predictors (small Cp values indicate a better fit). A model with a small Mallows' Cp value can be considered relatively unbiased and precise in estimating the true regression coefficients and predicting future responses.
+
+Here, I have applied the `plot` function to the previously created object *regfit.full* (refer to code chunk *Best Subset Selection*) in order to display the set of variables corresponding to the model with lowest Cp.
+
+
+The model with the lowest 'Cp' includes the following variables - *Overall_Quality*, *Northridge*, *Northridge Heights*, *Old Town*, *Stone Brook*, *Garage_Area*, *Total_Basement_Area* and *Above_Ground_Living_Area*
+
+(Note, 'Northridge', 'Northridge Heights', 'Old Town' and 'Stone Brook' are three levels of the 'Neighborhood' variable.)
+```{r}
+plot(regfit.full, scale = "Cp")
+```
+
+## Display the Selected Variables for R2
+
+There are three models with the highest R2 value of 0.83. The model with the smallest number of predictors includes the following variables- *Overall_Quality*, *Northridge Heights*, *Stone Brook*, *Garage_Area*,*Total_Basement_Area* and *Above_Ground_Living_Area*.
+
+
+```{r}
+plot(regfit.full, scale = "r2")
+```
+
+## Forward Stepwise Feature Selection
+
+In this code chunk I will use the `regsubsets()` function to perform forward stepwise feature selection by using the argument `method = "forward"`.
+
+From the forward stepwise feature selection output it can be seen that the best
+4 variable model contains- *Overall_Quality*, *Above_Ground_Living_Area*, *Total_Basement_Area* and *Garage_Area*. 
+
+On the basis of the output obtained in the previous code chunks from best subset selection, lowest BIC value, lowest Cp value, highest R2 value and the current output of forward stepwise feature selection, it is evident that the best four variable model will include the following predictors- *Overall_Quality*, *Above_Ground_Living_Area*, *Total_Basement_Area* and *Garage_Area*. In terms of the *Neighborhood* variable not all levels of the variable were included in the best subset of predictors. However, as explained previously (refer to code chunk *Best Subset Selection*), I will retain all levels of the *Neighborhood* variable in my model. Hence, my final model will contain all 5 input variables, i.e., *Overall_Quality*, *Above_Ground_Living_Area*, *Total_Basement_Area*, *Garage_Area* and *Neighborhood*.
+
+```{r}
+set.seed(123)
+
+regfit.fwd <- regsubsets(Sale_Price~ Overall_Quality + Neighborhood +Garage_Area + Total_Basement_Area + Above_Ground_Living_Area, data = training_dataset_regression, method = "forward")
+
+summary(regfit.fwd)
+```
+
+## Check the Variance Inflation Factor Values (training data)
+
+Here, I have checked the GVIF values for  *model_regression* (*model_regression* was built using the training dataset). The GVIF values for the input variables are low indicating a low correlation among the variables.
+
+```{r}
+vif(model_regression)
+```
+
+
+
+## Diagnostic Plots for `model_regression`
+
+Here, I have produced the diagnostic plots for *model_regression*. As mentioned in the code chunk *Diagnostic Plots for Linear Model3*, the Scale-Location plot for the model shows heteroscedasticity which was also confirmed by using the Breusch-Pagan Test (refer to code chunk *Check for Heteroscedasticity*).
+
+One way of dealing with heteroscedasticity is by using the generalized least squares (GLS) method. GLS regression is used to go beyond the ordinary least-squares (OLS) estimation of the normal linear model by providing for errors with unequal variance and/or correlated errors (Kaufman, 2013). In R, GLS can be performed by using the `gls` function (from *nlme* package). Hence, in the next step I will fit my linear model using the generalized least squares estimator.
+
+
+```{r}
+par(mfrow = c(2, 2))
+plot(model_regression)
+
+```
+
+
+## Build the Model Using `gls` Function
+
+Here, I have used the `gls` function (from *nlme* package) to fit my linear model (*model_regression*) using generalized least squares (as explained in the code chunk *Diagnostic Plots for `model_regression`*). The output has been saved as a new object called **gls_model**.
+
+The summary output of *gls_model* differs from the summary output of *model_regression*. The output of *gls_model* shows both the intercept and coefficients and correlation coefficients for all the variables included in the model. The coefficients and standard errors appear similar to those obtained for *model_regression* (refer to code chunk *Generate the Summary of `model_regression`*).  
+The output for *gls_model* also provides the Akaike information criterion (AIC) and BIC values. AIC and BIC combine a term which reflects how well the model fits the data with a term that penalizes the model in proportion to its number of parameters (Kriegeskorte, 2015). For both AIC and BIC lower numbers are better as they capture the amount of information that is not explained by the model.
+The AIC value for *gls_model* is *54524.13*, while the BIC value is *54713.71*.
+In the next step I will compare the AIC and BIC values of *gls_model* and *model_regression*.
+
+```{r}
+set.seed(123)
+
+gls_model <- gls(Sale_Price ~ Overall_Quality +Garage_Area + Neighborhood+ Total_Basement_Area + Above_Ground_Living_Area, data = training_dataset_regression)
+
+options(pillar.print_max = Inf)
+
+summary(gls_model)
+
+```
+
+## Compare AIC and BIC Values of `gls_model` and `model_regression`
+
+In the first line of code I have extracted the AIC and BIC values for *model_regression* and *gls_model*. Next, I have given the name `AIC lm` and `BIC lm` to the AIC and BIC values for *model_regression*, while the AIC and BIC values for *gls_model* have been named `AIC gls` and `BIC gls`.
+
+The AIC and BIC values for *model_regression* are *55072.25* and *55262.29* respectively. These values are higher than the AIC (*54524.13*) and BIC (*54713.71*) values for *gls_model*. 
+Therefore, on the basis of the AIC and BIC values it appears that the linear model fit with generalized least squares i.e., (*gls_model*) performs slightly better.
+
+```{r}
+a <- c(AIC(model_regression), BIC(model_regression), AIC(gls_model), BIC(gls_model))
+b <- c("AIC lm", "BIC lm", "AIC gls", "BIC gls")
+
+names(a) <- b
+print(a)
+
+```
+
+
+## K-Fold Cross Validation (training data)
+
+Cross-validation, i.e., cv, is a method for estimating the predictive performance of models. Cross-validation is used to compare learning algorithms by dividing the data into a training and test set. K-Fold CV refers to when a dataset is split into K number of folds, and each fold is used as a testing set at some point.
+
+The `train` function (from `caret` package) can be used to evaluate (by using resampling) the effect of model tuning parameters on performance and estimate model performance from a training set. I have used the `train` function with `method="lm"` to fit my linear model. The dataset used is the training dataset, i.e. `training_dataset_regression`. The output has been saved as a new object called **model_regression_cv**.
+
+The function `trainControl` (from `caret` package) generates parameters that further control how models are created, with possible values such as `cv`, `repeatedcv`, `LOOCV` etc. 
+
+For my `trainControl` function, I have specified the method as `cv`, `number` (controls the number of folds in K-fold cv) has been set as `10`. 
+Hence, training control has been defined as a 10 fold cv and saved as a new object called **train_control**.
+
+The cross-validation output provides the following values-</br>
+1)RMSE= 30835.27</br>
+2)R2= 0.845</br>
+3)MAE= 21598.12</br>
+
+```{r, warning=FALSE}
+set.seed(124)
+
+train_control <- trainControl(method="cv", number=10)
+
+model_regression_cv <- train(Sale_Price ~ Overall_Quality +Garage_Area + Neighborhood+ Total_Basement_Area + Above_Ground_Living_Area, data=training_dataset_regression, method="lm" ,trControl = train_control)
+
+model_regression_cv
+```
+
+## K-Fold CV (testing data)
+
+Here, I have performed K-Fold cv using the test dataset, i.e., `testing_dataset_regression`. Training control has been defined as a 10 fold cv and saved as a new object called **train_control**.
+
+The cross-validation output provides the following values-</br>
+1)RMSE=30401.63</br>
+2)R2=0.856</br>
+3)MAE=20682.58</br>
+
+The RMSE value for the test data (RMSE= 30401.63) is lower than the RMSE value for the training data (RMSE= 30835.27).Conversely, the R2 value for the test data (R2= 0.856) is higher than the R2 value for the training data (R2= 0.845). The MAE value for the test data (MAE= 20682.58) is lower than the MAE value for the training data (MAE=21598.12 ). It is evident that the difference between the training data and test data values is small. Therefore, the model performance can be considered accurate.
+
+```{r, warning=FALSE}
+
+set.seed(124)
+
+train_control <- trainControl(method="cv", number=10)
+
+model_regression_cv_test <- train(Sale_Price ~ Overall_Quality +Garage_Area + Neighborhood+ Total_Basement_Area + Above_Ground_Living_Area, data=testing_dataset_regression, method="lm" ,trControl = train_control)
+
+model_regression_cv_test
+```
+
+
+## Performance Metrics for Model Fitted with `gls` (test data)
+
+In this code chunk I have used the `predict` function to obtain model predictions for the linear model fitted with generalized least squares, i.e., *gls_model*.
+Next, I have derived the model performance metrics such as R2, Root Mean Square Error (RMSE) and Mean Absolute Error (MAE) for *gls_model*. The output has been saved as a new object called **model_performance_metrics_gls**.
+
+The model performance metric values for *gls_model* are-</br>
+1)RMSE= 30481.13</br>
+2)R2=0.858285</br>
+3)MAE=19674.34</br>
+
+The RMSE value for *gls_model* (RMSE=30481.13) is the same as that obtained for *model_regression* (RMSE= 30481.13). Similarly, the R2 value (R2=0.858) for *gls_model* and the MAE value (MAE=19674.34) is the same as the R2 (0.858) and MAE value (19674.34) obtained for *model_regression* (refer to code chunk *Split the Data into Training and Test Set*). 
+Although, it is noteworthy to highlight that the AIC and BIC values for *gls_model* were lower as compared to the AIC and BIC values obtained for *model_regression* (refer to code chunk *Compare AIC and BIC Values of `gls_model` and `model_regression`*). 
+
+Hence, for my final model I will pick the linear model fitted with generalized least squares, i.e., *gls_model* with 5 predictors (*Overall_Quality*, *Garage_Area*,  *Neighborhood*, *Total_Basement_Area* and *Above_Ground_Living_Area*).
+In reference to my research question, i.e.,  how do property size and neighborhood location affect the sale price of houses in Ames, Iowa, I can conclude that overall better quality houses are worth more. Furthermore, the sale price of a house increases as property size increases. Finally, the sale price of a house varies across different neighborhoods with the highest median sale price found in Stone Brook neighborhood of Ames, Iowa.
+
+
+```{r}
+
+predictions_regression_gls <- predict(gls_model, testing_dataset_regression)
+
+
+model_performance_metrics_gls <- data.frame(R2= R2(predictions_regression_gls, testing_dataset_regression$Sale_Price),
+           RMSE= RMSE(predictions_regression_gls, testing_dataset_regression$Sale_Price),
+           MAE = MAE(predictions_regression_gls, testing_dataset_regression$Sale_Price))
+
+
+
+print(model_performance_metrics_gls)
+
+```
+
+
+
+
+
+References
+
+Harrell, F. E., Jr. (2015). Regression modeling strategies. *Springer International Publishing*.
+
+James, G., Witten, D., Hastie, T., & Tibshirani, R. (2021). An introduction to statistical learning (2nd  ed.). *Springer*.
+
+Kaufman, R. L. (2013). Heteroskedasticity in regression: Detection and correction. *SAGE Publications, Inc*. https://dx.doi.org/10.4135/9781452270128
+
+Kriegeskorte, N.(2015). Crossvalidation. *Brain Mapping, 1*, 635-639. https://doi.org/10.1016/B978-0-12-397025-1.00344-4
+
+Williams, C.(2020).How to Create a Correlation Matrix with Too Many Variables in R. *Towards Data Science*.
+https://towardsdatascience.com/how-to-create-a-correlation-matrix-with-too-many-variables-309cc0c0a57
