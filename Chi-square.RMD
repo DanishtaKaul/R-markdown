@@ -109,5 +109,6 @@ eff_size <- cramersV(x= study4_dat$treat, y= study4_dat$redeem, correct = FALSE)
 
 
 
-Well done, you are finished! To ensure there are no issues with the file, please try knitting your markdown document. You should submit the raw .Rmd file (NOT the knitted html file) to the submission link on Moodle.
+
+
 
