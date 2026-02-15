@@ -6,32 +6,14 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # R Portfolio 2: Chi-square
 
-In order to complete these exercises you will need to download the data .csv file, as well as the assignment .Rmd file, which you need to edit, titled `GUID_RM1_2.Rmd`. These can be downloaded from the Moodle site. Once downloaded and unzipped, you should create a new folder that you will use as your working directory; put the data files and the .Rmd file in that folder and set your working directory to that folder through the drop-down menus at the top.
-
-The exercises in this portfolio will again use data from [Rogers, T. & Milkman, K. L. (2016). Reminders through association. Psychological Science, 27, 973-986](https://journals.sagepub.com/stoken/default+domain/6XgDSfr6ZHSDs47tx5bu/full) that you used in the in-class activities, however, this time we will be looking at the data from Study 4. It may help you to read through the results section in the main paper so that you can better visualise the data you are working with. The basic premise of the study is that it looked at whether participants would be more likely to follow through with their intention with a reminder through association (RTA) or with a written reminder.
-
-## Before starting lets check:
-
-1. The `.csv` file is saved into a folder on your computer and you have manually set this folder as your working directory. 
-
-2. The `.Rmd` file is saved in the same folder as the `.csv` files. For assessments we ask that you save it with the format `GUID_RM1_2.Rmd` where `GUID` is replaced with your `GUID`.
-
-Only change the `NULL` with what the question asks for and then make sure that the file knits at the end so that you have a fully reproducible code. When altering code inside the code blocks, *do not* re-order or rename the code blocks (T1, T2, ... etc.).  If you do this then the code is no longer consistent across people and this will impact your grade!
-
-## Activity 1 - Load the tidyverse
-
-In the code chunk below, write and run the code to load the packages `tidyverse` and `lsr`.
+## Load the tidyverse
 
 ```{r T01}
 library(tidyverse)
 library(lsr)
 ```
 
-## Activity 2 - Load in the data
-
-Now we have the tidyverse loaded, edit the below code to load in the data file`RTA_Study4.csv` and then run the code (make sure you have loaded the tidyverse). You need to replace the `NULL` with the code used to load the data. 
-
-You should use `read_csv()` to load the files and NOT `read.csv()` as it will change the names of your variables and you won't get the correct answers for the rest of the tasks!
+## Load in the data
 
 ```{r T02}
 # hint: name <- read_csv("file_name.csv")
@@ -40,40 +22,28 @@ study4_dat <- read_csv("RTA_Study4.csv")
 
 ## View the data
 
-It is always a good idea to familiarise yourself with the layout of the data that you have just loaded in. View your data either by clicking on the object in the environment or by using, e.g., `summary()`.
-
-The data file is very simple, it has two variables:
-
 * `treat` is the experimental condition that participants were assigned to: 1 = rta condition, 0 = control condition
 * `redeem` is whether participants redeemed the flyer (i.e., if they followed through on their intention): 1 = redeemed the flyer, 0 = did not redeem the flyer. 
 
-## Activity 3: Count 1
-
-Using `count()` calculate the **total** number of participants who redeemed the flyer and store this in an object named `redeem_n`. If you have done this correctly, your table should look like the below.
+## Count 1
 
 ```{r T03}
 redeem_n <- count(study4_dat,redeem)
 ```
 
-## Activity 4: Count 2
-
-Using `count()` calculate the **total** number of participants in each experimental condition and store this in an object named `treat_n`. If you have done this correctly, your table should look like the below.
+## Count 2
 
 ```{r T04}
 treat_n <-count(study4_dat,treat)
 ```
 
-## Activity 5: Count 3
-
-Using `count()` calculate the number of participants who redeemed the flyer in each experimental condition and store this in an object named `experimental_n`. If you have done this correctly, your tabel should look like the below.
+## Count 3
 
 ```{r T05}
 experimental_n <-count(study4_dat, redeem, treat)
 ```
 
-## Activity 6: Bar plot
-
-First, copy the code from the instructions into the below code chunk and run it. This code tells R that the data in `treat` and `redeem` is a factor, or a category, so that it doesn't treat it like a continuous number. Will we explain this more in RM2 - you do not need to understand or edit this code for now, please just copy and run the code. **If you don't run this code chunk, your bar plot will not work.**
+## Bar plot
 
 ```{r factors}
 # copy code from instructions here
@@ -82,11 +52,7 @@ study4_dat <- study4_dat %>%
          treat = as.factor(treat))
 ```
 
-Using `ggplot()` and `study4_dat`, write the code in chunk T06 to make a bar plot that shows the number of participants who redeemed the flyer in each experimental condition. 
-
-* At the moment, the dataset displays the different conditions as 1s and 0s. You should edit the labels on the x-axis and fill legend so that these are displayed as informative text labels to make the graph easier to read. 
-* You should also change the way that the plot looks. You can choose whatever colour and theme you like best, but it must not be the default. 
-* Finally, the bars should be next to each other, rather than on top of each other. 
+## Using `ggplot()` and `study4_dat` make a bar plot that shows the number of participants who redeemed the flyer in each experimental condition.  
 
 ```{r T06}
 ## ggplot code here 
@@ -98,9 +64,7 @@ ggplot(data = study4_dat, aes(x = treat, fill = redeem)) +
   theme_minimal()
 ```
 
-## Activity 7: Chi-square
-
-Replace the `NULL` in chunk T07 with the code to perform a chi-square test of association to determine whether there is a significant association between the experimental condition (`treat`) and whether participants redeemed the voucher. Store the results of this analysis in an object named `results`. Do not apply a continuity correction.
+## Chi-square
 
 ```{r T07}
 results <- chisq.test(x = study4_dat$treat, 
@@ -108,17 +72,15 @@ results <- chisq.test(x = study4_dat$treat,
                       correct = FALSE)
 ```
 
-## Activity 8: Interpret the test
-
-Replace the `NULL` below with the chi-square statistic to 2 decimal places. Please do not use code to answer this question, please just write the numbers. Please also do not put the number in quotation marks of any kind, just write the number on its own. 
+## Interpret the test
 
 ```{r T08}
 results_chi <- 3.01
 ```
 
-## Activity 9: Interpret the test
+## Interpret the test
 
-Look at the p-value for the test and then replace the `NULL` below with the number of the statement you think is correct. Please do not put the number in quotation marks of any kind, just write the number on its own. 
+Look at the p-value for the test and then replace the `NULL` below with the number of the statement that is correct. 
 
 1. The p-value is below .05 and is therefore significant.
 2. The p-value is above .05 and is therefore significant.
@@ -129,168 +91,23 @@ Look at the p-value for the test and then replace the `NULL` below with the numb
 answer_a9 <- 3
 ```
 
-## Activity 10: Expected frequencies
+## Expected frequencies
 
-To check the assumptions of the test, use code to view the expected frequencies and replace the `NULL` below with the lowest expected frequency to 2 decimal places. Please do not use code to answer this question, please just write the numbers, without any quotation marks.
+To check the assumptions of the test, use code to view the expected frequencies and replace the `NULL` below with the lowest expected frequency to 2 decimal places. 
 
 ```{r T10}
 lowest_expected <- 50.18
 ```
 
-## Activity 11: Effect size
+## Effect size
 
-For the final coding question, replace the `NULL` below with code to calculate Cramer’s V effect size using the `cramersV()` function from the `lsr` package and store this in the object `eff_size`.
+Replace the `NULL` below with code to calculate Cramer’s V effect size using the `cramersV()` function from the `lsr` package and store this in the object `eff_size`.
 
 ```{r T11}
 eff_size <- cramersV(x= study4_dat$treat, y= study4_dat$redeem, correct = FALSE)
 ```
 
 
-The following 11 questions are all based on the lecture content and are multiple choice questions. For each question please replace the `NULL` with the number of the statement you believe to be the correct answer. Please only write a single number, not words, and this number should not be in any kind of quotation marks. 
-
-## Activity 12
-
-Which of the following is a discrete variable?
-
-1. Weight 
-2. Reaction time
-3. Temperature 
-4. Finish position in a race (e.g. 1st, 2nd etc) 
-
-```{r T12}
-answer_12 <- 4
-```
-
-## Activity 13
-
-Which of the following is a continuous variable?
-
-1. Height 
-2. Smoker status (Non-Smoker or Smoker) 
-3. Blood type
-4. Occupation 
-
-
-```{r T13}
-answer_13 <- 1
-```
-
-## Activity 14
-
-What is considered to be the most basic level of measurement 
-
-1. Nominal 
-2. Ordinal 
-3. Interval 
-4. Ratio 
-
-```{r T14}
-answer_14 <- 1
-```
-
-## Activity 15
-
-The distribution of a variable can be described in terms of
-
-1. Centre and Spread
-2. Shape 
-3. Outliers 
-4. All of the above
-
-```{r T15}
-answer_15 <- 4
-```
-
-## Activity 16
-
-Which of the following is a measure of central tendency? 
-
-1. Mean
-2. Range 
-3. Standard Deviation 
-4. None of the above 
-
-```{r T16}
-answer_16 <- 1
-```
-
-## Activity 17
-
-Which of the following is a measure of dispersion/spread? 
-
-1. Mean 
-2. Mode 
-3. Standard Deviation 
-4. Median 
-
-```{r T17}
-answer_17 <- 3
-```
-
-
-## Activity 18
-
-The probability level of .05 Is equal to what percentage probability of an event occurring
-
-1. 0.5%
-2. 5%
-3. 5.5%
-4. 50%
-
-```{r T18}
-answer_18 <- 2
-```
-
-## Activity 19
-
-On a normal curve approximately what percentage of scores falls between -1SD and +1SD
-
-1. 6.%
-2. 16%
-3. 68%
-4. 96%
-
-```{r T19}
-answer_19 <- 3
-```
-
-## Activity 20
-
-Which of the following statements about the Chi Square test are TRUE
-a. It is a non-parametric test
-b. it produces observed frequencies 
-c. Can be used with nominal data 
-d. All of the above 
-
-```{r T20}
-answer_20 <- 4
-```
-
-## Activity 21
-
-Which of the following statements about the Chi Square test is FALSE 
-
-1. The test can be used for between subjects designs 
-2. The test can be used for within subjects designs 
-3. There is more than one type of Chi Square test 
-4. All of the above
-
-```{r T21}
-answer_21 <- 2
-```
-
-## Activity 22
-
-Which of the following statistical statement summarises a Chi Square analysis?
-
-1. χ2 (1) = 35.56, p < .001
-2. F (1, 46) = 3.43, p = .161 ω2 = .004
-3. t(1) = 5.44, p < .05
-4. R2 =.45, F(4, 56)=5.56, p<.01
-
-```{r T22}
-answer_22 <- 1
-```
-
 
 Well done, you are finished! To ensure there are no issues with the file, please try knitting your markdown document. You should submit the raw .Rmd file (NOT the knitted html file) to the submission link on Moodle.
+
